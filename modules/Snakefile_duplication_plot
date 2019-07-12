@@ -1,0 +1,53 @@
+#!/usr/bin/python
+import glob
+import sys
+import os
+
+project = config['project']
+
+deduplication_dir = 'deduplication'
+
+def getReport(wildcards):
+    return glob.iglob(project + '/../Manifest/*.csv', recursive=False)
+	
+rule all:
+    input:
+        png_lane_dup_rate = deduplication_dir + '/lane_dup_rate.png',
+        png_subject_dup_rate = deduplication_dir + '/subject_dup_rate.png'
+
+rule deduplication_table:
+    input:
+        getReport
+    output:
+        lane_dup_rate = deduplication_dir + '/lane_dup_rate.txt',
+        subject_dup_rate = deduplication_dir + '/subject_dup_rate.txt'
+    params:
+        deduplication_dir
+    shell:
+        'sh ./dedup_rate.sh {input} {params}'
+
+rule deduplication_plot:
+    input:
+        lane_dup_rate = deduplication_dir + '/lane_dup_rate.txt',
+        subject_dup_rate = deduplication_dir + '/subject_dup_rate.txt'
+    output:
+        png_lane_dup_rate = deduplication_dir + '/lane_dup_rate.png',
+        png_subject_dup_rate = deduplication_dir + '/subject_dup_rate.png',
+        R = deduplication_dir + '/deduplication_rate.R',
+        Rout = deduplication_dir + '/deduplication_rate.R.out'
+    run:
+        rTxt = '''
+        no_col <- (max(count.fields("''' + str(input.lane_dup_rate) + '''", sep = "\t")) -1)
+        data_deduplication_lane <- read.table("''' + str(input.lane_dup_rate) + '''", header = FALSE, fill=TRUE, sep = "\t",col.names=c("SUBJECT", 1:no_col) )
+        png("''' + str(output.png_lane_dup_rate) + '''")
+        matplot(data_deduplication_lane,pch=1,ylim= c(0, 0.5),col = 1:no_col, xlab= "Sample", ylab= "lane duplication rate", cex = 0.4)
+        legend("topleft", legend = c(1:no_col),pch=1, col = 1:no_col)
+        dev.off()
+        data_deduplication_sub <- read.table("''' + str(input.subject_dup_rate) + '''", header = FALSE, sep = "\t" )
+        png("''' + str(output.png_subject_dup_rate) + '''")
+        matplot(data_deduplication_sub,pch=1,ylim= c(0, 0.5), xlab= "Sample", ylab= "subject duplication rate", cex = 0.4)
+        dev.off()		
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')

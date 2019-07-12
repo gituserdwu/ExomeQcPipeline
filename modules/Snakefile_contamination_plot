@@ -1,0 +1,29 @@
+#!/usr/bin/python
+
+project = config['project']
+
+contamination_dir = 'bamContamination'
+
+rule all:
+    input:
+        contamination_dir + '/bam_contamination_rate.png'
+
+rule contamination_plot:
+    input:
+        project + '/subject_level_BAM_contamination/results/bam_location.txt.all.output'
+    output:
+        png_contamination = contamination_dir + '/bam_contamination_rate.png',
+        R = contamination_dir + '/bam_contamination_rate.R',
+        Rout = contamination_dir + '/bam_contamination_rate.R.out'
+    run:
+        rTxt = '''
+        data_contamination <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_contamination) + '''")
+        sortData <- data_contamination[with(data_contamination, order(data_contamination$Contamination_rate)), ]
+        plot(sortData$Contamination_rate, xlab="Samples", ylab="Bam Contamination Rate", pch=20, cex = 0.4)
+        dev.off()
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+

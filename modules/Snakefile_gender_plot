@@ -1,0 +1,56 @@
+#!/usr/bin/python
+import glob
+import sys
+import os
+from glob import iglob
+
+project = config['project']
+
+gender_check_dir = 'gender_check'
+bamDir = project + '/../bam_location/*'
+
+def getManifest(wildcards):
+    return glob.iglob(project + '/../Manifest/*.csv', recursive=False)
+
+SAMPLES=[]
+
+for bam in glob.iglob(bamDir + '/*.bam', recursive=True):
+    samp = os.path.basename(bam)[:-4]
+    SAMPLES.append(os.path.basename(bam)[:-4])
+
+#rule all:
+#    input:
+
+rule XYratio_table:
+    input:
+        count = expand(project + '/gender_concordance/intermediate_files/counts/{sample}_X_Y_COUNTS.txt', sample = SAMPLES),
+        Manifest = getManifest
+    output:
+        gender_check_dir + '/XYratio_table.txt'
+    params:
+#        Manifest = getManifest, get error message of 'generator' object is not subscriptable, when use this function at params.
+        merged_table = gender_check_dir + '/XYratio_merged.txt'
+    run:
+        with open(params.merged_table, 'w') as mergedfile:
+            for fname in input.count:
+                with open(fname) as infile:
+                    for line in infile:
+                        mergedfile.write(line)
+        mergedfile.close()
+        genderDic = {}
+#        with open(params.Manifest[0], 'r') as manifest: get errors of read just the first letter of the path, turn out only input is list, params is suppose to be string and don't need to add [0]
+        with open(input.Manifest[0], 'r') as manifest:
+            next(manifest)
+            for line in manifest:
+               key = line.split(',')[6] + '_' + line.split(',')[12]
+               genderDic[key] = line.split(',')[9]
+        with open(params.merged_table, 'r') as infile, open(output[0], 'w') as outfile:
+            outfile.write( 'SAMPLE\tChrX\tChrY\tIDENTIFILER GENDER\tYXratio' + '\n' )
+            for line in infile:
+                ratio = float(line.split('\t')[2])/float(line.split('\t')[1])
+                value = genderDic.get(line.split('\t')[0].strip())
+                if value is not None:
+                    outfile.write(line.strip().replace("F","1") + '\t' + value + '\t' + str(ratio) + '\n')
+
+
+        
