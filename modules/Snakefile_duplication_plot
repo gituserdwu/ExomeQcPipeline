@@ -4,49 +4,69 @@ import sys
 import os
 
 project = config['project']
+manifest = config['manifest']
 
 deduplication_dir = 'deduplication'
 
-def getReport(wildcards):
-    return glob.iglob(project + '/../Manifest/*.csv', recursive=False)
+# def getReport(wildcards):
+    # return glob.iglob(project + '/../Manifest/*.csv', recursive=False)
 	
-rule all:
-    input:
-        png_lane_dup_rate = deduplication_dir + '/lane_dup_rate.png',
-        png_subject_dup_rate = deduplication_dir + '/subject_dup_rate.png'
+# rule all:
+   # input:
+       # png_lane_dup_rate = deduplication_dir + '/lane_dup_rate.png',
+       # outlier_dup = deduplication_dir + '/top10_dup_rate.txt',
+       # png_subject_dup_rate = deduplication_dir + '/subject_dup_rate.png'
 
 rule deduplication_table:
     input:
-        getReport
+        manifest
     output:
-        lane_dup_rate = deduplication_dir + '/lane_dup_rate.txt',
+        merged_dup_rate = deduplication_dir + '/merged_dup_rate.txt',
         subject_dup_rate = deduplication_dir + '/subject_dup_rate.txt'
     params:
         deduplication_dir
     shell:
-        'sh ./dedup_rate.sh {input} {params}'
+        'sh ./modules/dedup_rate.sh {input} {params}'
 
 rule deduplication_plot:
     input:
-        lane_dup_rate = deduplication_dir + '/lane_dup_rate.txt',
+        merged_dup_rate = deduplication_dir + '/merged_dup_rate.txt',
         subject_dup_rate = deduplication_dir + '/subject_dup_rate.txt'
     output:
         png_lane_dup_rate = deduplication_dir + '/lane_dup_rate.png',
         png_subject_dup_rate = deduplication_dir + '/subject_dup_rate.png',
+        outlier_dup = deduplication_dir + '/top10_dup_rate.txt',        
         R = deduplication_dir + '/deduplication_rate.R',
         Rout = deduplication_dir + '/deduplication_rate.R.out'
     run:
         rTxt = '''
-        no_col <- (max(count.fields("''' + str(input.lane_dup_rate) + '''", sep = "\t")) -1)
-        data_deduplication_lane <- read.table("''' + str(input.lane_dup_rate) + '''", header = FALSE, fill=TRUE, sep = "\t",col.names=c("SUBJECT", 1:no_col) )
+        library(ggplot2)
+        library(ggbeeswarm)
+        library(plyr)
+        require(reshape2)
+        library(reshape2)
+        no_col <- (max(count.fields("''' + str(input.merged_dup_rate) + '''", sep = "\t")) -4)
+        data_deduplication_lane <- read.table("''' + str(input.merged_dup_rate) + '''", header = FALSE, fill=TRUE, sep = "\t",col.names=c("SUBJECT","NUM_OF_LANE","TOTAL_DUP_RATE", "SECONDARY", 1:no_col) )
         png("''' + str(output.png_lane_dup_rate) + '''")
-        matplot(data_deduplication_lane,pch=1,ylim= c(0, 0.5),col = 1:no_col, xlab= "Sample", ylab= "lane duplication rate", cex = 0.4)
-        legend("topleft", legend = c(1:no_col),pch=1, col = 1:no_col)
+        df <- melt(data_deduplication_lane[,c(1,4:no_col,no_col+1,no_col+2,no_col+3,no_col+4)], id.vars = 'SUBJECT', variable.name = 'lane_num')
+        ggplot(df, aes(SUBJECT,value)) + 
+        geom_point() + 
+        facet_grid(lane_num ~ .) +
+        theme(axis.ticks.x=element_blank(),axis.text.x=element_blank())
         dev.off()
         data_deduplication_sub <- read.table("''' + str(input.subject_dup_rate) + '''", header = FALSE, sep = "\t" )
+        names(data_deduplication_sub) <- c("SAMPLE","LANE_NUM","TOTAL_DUP","SECONDARY_DUP")
+        max_lane=max(data_deduplication_sub$LANE_NUM)
+        sortData=data.frame(data_deduplication_sub$LANE_NUM, data_deduplication_sub$TOTAL_DUP) 
         png("''' + str(output.png_subject_dup_rate) + '''")
-        matplot(data_deduplication_sub,pch=1,ylim= c(0, 0.5), xlab= "Sample", ylab= "subject duplication rate", cex = 0.4)
-        dev.off()		
+        ggplot(data_deduplication_sub,aes(factor(LANE_NUM),TOTAL_DUP,color=factor(LANE_NUM))) + 
+        geom_quasirandom(varwidth = TRUE) +  
+        geom_boxplot(alpha = 0.3) +  
+        scale_x_discrete(name = "number of lanes", breaks = seq(0, max_lane, 1))
+        dev.off()
+        sink("''' + str(output.outlier_dup) + '''")
+        print(head(data_deduplication_sub[order(-data_deduplication_sub$TOTAL_DUP),],10))
+        sink()                     
         '''
         with open(output.R, 'w') as R:
             R.write(rTxt)

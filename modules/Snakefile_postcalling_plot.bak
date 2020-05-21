@@ -2,26 +2,30 @@
 import glob
 import sys
 import os
+from glob import glob
 
 project = config['project']
 
+#qsub -cwd -q research.q -N variants_annotated_nonysn_majority_intersect -o /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/variant_calling_logs/Ensemble/variants_annotated_nonysn_majority_intersect.stdout -e /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/variant_calling_logs/Ensemble/variants_annotated_nonysn_majority_intersect.stderr -b y "java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar filter \"( (FILTER != '1') & (Intersection_region = '1') & (Nonsyn = '1'))\" /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated.vcf > /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_nonysn_majority_intersect.vcf; perl  ~/script/zhubin/vcfFilter_count_base_change.pl /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_nonysn_majority_intersect.vcf /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_nonysn_majority_intersect_basechange.txt"
+#qsub -cwd -q research.q -N variants_annotated_majority -o /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/variant_calling_logs/Ensemble/variants_annotated_majority.stdout -e /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/variant_calling_logs/Ensemble/variants_annotated_majority.stderr -b y "java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar filter \"( ( FILTER =~ '2') | ( FILTER =~ '3') )\" /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated.vcf > /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_majority.vcf; perl  ~/script/zhubin/vcfFilter_count_base_change.pl /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_majority.vcf /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_majority_basechange.txt"
+#qsub -cwd -q research.q -N variants_annotated_nonysn_majority_intersect -o /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/variant_calling_logs/Ensemble/variants_annotated_nonysn_majority_intersect.stdout -e /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/variant_calling_logs/Ensemble/variants_annotated_nonysn_majority_intersect.stderr -b y "grep -e '^#' -e 'Intersection_region=1;Nonsyn=Y' /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_majority.vcf > /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_majority_nonsyn_intersect.vcf; perl  ~/script/zhubin/vcfFilter_count_base_change.pl /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_majority_nonsyn_intersect2.vcf /DCEG/Projects/Exome/builds/build_familial_build_2019_23806/Ensemble_New_Annotation/variants/variants_annotated_majority_nonsyn_intersect_basechange2.txt"
 postcalling_qc_dir = 'postcalling_qc'
+#GROUPS=['BC','CTRL']
 GROUPS=[]
 
-for bam_subdir in glob.iglob(project + '../bam_location/*', recursive=True):
-#    group = os.path.basename(bam_subdir)
-    GROUPS.append(os.path.basename(bam_subdir)
-
 def getReport(wildcards):
-    return glob.iglob(project + '/post_variant_calling_qc/post_variant_counts.txt', recursive=False)
+    return glob(project + '/post_variant_calling_qc/post_variant_counts.txt', recursive=False)
+	
+for bam_subdir in glob(project + '/../bam_location/*'):
+    GROUPS.append(os.path.basename(bam_subdir))
 	
 rule all:
     input:
         total_count = postcalling_qc_dir + '/variant_count.png',
         titv_ratio = postcalling_qc_dir + '/titv_ratio.png',
         lowqual_basechange = postcalling_qc_dir + '/lowqual_basechange.png',
-        basechange_group = postcalling_qc_dir + '/basechange_{group}.png'		
-	
+        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS) 
+
 rule postcalling_qc_table:
     input:
         getReport
@@ -83,18 +87,18 @@ rule lowqual_basechange_plot:
             R.write(rTxt)
         shell('R --vanilla < {output.R} > {output.Rout}')
 
-rule_basechange_group_plot:
+rule basechange_group_plot:
     input:
         postcalling_qc_dir + '/basechange_{group}.txt'
     output:
         basechange_group = postcalling_qc_dir + '/basechange_{group}.png',
-        R = postcalling_qc_dir + '/lowqual_basechange.R',
-        Rout = postcalling_qc_dir + '/lowqual_basechange.R.out'
+        R = postcalling_qc_dir + '/basechange_{group}.R',
+        Rout = postcalling_qc_dir + '/basechange_{group}.R.out'
     run:
         rTxt = '''
         data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t" )
         png("''' + str(output.basechange_group) + '''")
-        matplot(t(data[,2:ncol(data)]), type = c("b"),pch=20,col = data[,1]) #plot
+        matplot(t(data[,2:ncol(data)]),xlab= "Quality Categories", ylab= "Variant Number", type = c("b"),pch=20,col = data[,1]) #plot
         legend("topleft", legend = data[,1], col=data[,1], pch=20)
         axis(1, at=2:ncol(data), labels=colnames(data[,2:ncol(data)]),las=2)
         dev.off()

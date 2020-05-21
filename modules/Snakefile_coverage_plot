@@ -4,18 +4,11 @@ import glob
 import sys
 import os
 
-project = config['project']
 
-coverage_dir = 'coverage'
-CONTROLS = ['PLCO', 'ACS', 'LC_IGC', 'CTRL']
-
-def getReport(wildcards):
-    return glob.iglob(project + '/*_coverage_report.txt', recursive=False)
-
-rule all:
-    input:
-        png_ave_depth = coverage_dir + '/Average_Coverage_caco.png',
-        png_mosdepth = coverage_dir + '/mosdepth_total_dist.html'
+#rule all:
+#    input:
+#        png_ave_depth = coverage_dir + '/Average_Coverage_caco.png',
+#        lane_dup_rate = coverage_dir + '/Final_merged_coverage.txt'
 		
 rule mosdepth:
     input:
@@ -35,32 +28,62 @@ rule average_depth_caco:
         coverage_dir + '/Average_Coverage_caco.txt'
     run:
         with open(output[0], 'w') as out, open(input[0]) as f:
-            out.write( 'STATUS\tCOV' + '\n' )
+            out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
             next(f)
             for line in f:
                 SAMPLE=line.split('\t')[3]
-                DEPTH=line.split('\t')[24].rstrip()
+                DEPTH=line.split('\t')[25].rstrip()
                 if not any (CONTROL in line for CONTROL in CONTROLS):
-                    out.write( '1\t' + DEPTH + '\n' )
+                    out.write( SAMPLE + '\tCASE\t' + DEPTH + '\n' )
                 else:
-                    out.write( '2\t' + DEPTH + '\n' )
+                    out.write( SAMPLE + '\tCONTROL\t' + DEPTH + '\n' )
+                    
+rule final_table:
+    input:
+        Manifest = manifest,
+        input = coverage_dir + '/Average_Coverage_caco.txt'
+    output:
+        lane_dup_rate = coverage_dir + '/Final_merged_coverage.txt',
+        subject_dup_rate = coverage_dir + '/../Downsample.txt'
+    params:
+        coverage_dir
+    shell:
+        'sh ./modules/coverage_merge.sh {input.Manifest} {input.input} {params}'
      
 rule average_depth_plot:
     input:
-        coverage_dir + '/Average_Coverage_caco.txt'
+        coverage_dir + '/Final_merged_coverage.txt'
     output:
         png_aveCov = coverage_dir + '/Average_Coverage_caco.png',
+        png_addedCov = coverage_dir + '/Added_Coverage_caco.png',
         R = coverage_dir + '/average_depth_plot.R',
         Rout = coverage_dir + '/average_depth_plot.R.out'
     run:
         rTxt = '''
+        library(ggplot2)
         data_coverage <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
-        colors <- c(rgb(0, 0, 1, .3), rgb(1, 0, 0, .3), rgb(.75, .75, .75, .3), rgb(0, 1, 0, .3))
+        colors <- c("CASE"="#f04546", "CONTROL"="#3591d1", "MergedBam"="#f04546", "LaneBamSum"="#3591d1")
         sortData <- data_coverage[with(data_coverage, order(data_coverage$STATUS,data_coverage$COV)), ]
-        png("''' + str(output.png_aveCov) + '''")
-        plot(sortData$COV, xlab="Samples", ylab="Average Coverage", pch=20, col= colors[sortData$STATUS], cex = 0.4)
-        title(main= "Sample Coverage across Whole Exome Capture Region",sub= "", cex=0.6)
-        legend("topright", legend = c("Cases", "Controls"), col = c("blue", "red"), pch = 19, cex=0.7, bty="n")
+        downsample <- c("YES"=4, "NO"=19)
+        png("''' + str(output.png_aveCov) + '''", 7, 7, "in", res = 300)
+        gg <- ggplot(sortData, aes(x=factor(ANALYSISID, levels=unique(ANALYSISID)), y=COV)) 
+        gg + geom_point(aes(shape=as.factor(DOWNSAMPLE),color=as.factor(STATUS))) + 
+        scale_shape_manual(name="Downsample", values=downsample) +
+        scale_color_manual(name="Status",values=colors) + 
+        coord_cartesian(clip = 'off') +
+        labs(x = "samples", y = "Average Cov") +
+        theme(legend.position="right",axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+        theme(axis.line = element_line(size = 1, colour = "grey"),panel.background = element_rect(fill = "white"))
+        dev.off()
+        png("''' + str(output.png_addedCov) + '''", 6.5, 6.5, "in", res = 300)
+        gg <- ggplot(sortData, aes(x=factor(ANALYSISID, levels=unique(ANALYSISID))))
+        gg + geom_point(aes(y=COV, shape=as.factor(DOWNSAMPLE), color="MergedBam")) +
+        geom_point(aes(y=ADDED_COV, shape=as.factor(DOWNSAMPLE),color="LaneBamSum")) +
+        scale_shape_manual(name="Downsample", values=downsample) + 
+        labs(x = "samples", y = "Cov") +
+        theme(legend.position="right",axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+        theme(axis.line = element_line(size = 1, colour = "grey"),panel.background = element_rect(fill = "white"))
+        dev.off()
         '''
         with open(output.R, 'w') as R:
             R.write(rTxt)

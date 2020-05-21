@@ -4,43 +4,50 @@ import sys
 import os
 from glob import glob
 
-project = config['project']
 
-postcalling_qc_dir = 'postcalling_qc'
-#GROUPS=['BC','CTRL']
-GROUPS=[]
+#rule all:
+#    input:
+#        total_count = postcalling_qc_dir + '/variant_count.png',
+#        titv_ratio = postcalling_qc_dir + '/titv_ratio.png',
+#        #lowqual_basechange = postcalling_qc_dir + '/lowqual_basechange.png',
+#        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS), 
+#        basechange_all = postcalling_qc_dir + '/basechange_all.png',
 
-def getReport(wildcards):
-    return glob(project + '/post_variant_calling_qc/post_variant_counts.txt', recursive=False)
-	
-for bam_subdir in glob(project + '/../bam_location/*'):
-    GROUPS.append(os.path.basename(bam_subdir))
-	
-rule all:
+rule run_basechange:
     input:
-        total_count = postcalling_qc_dir + '/variant_count.png',
-        titv_ratio = postcalling_qc_dir + '/titv_ratio.png',
-        lowqual_basechange = postcalling_qc_dir + '/lowqual_basechange.png',
-        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS) 
+        ensemble_vcf
+    output:
+        postcalling_qc_dir + '/variants_annotated_basechange.txt'
+    params:
+        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf'
+    shell:
+        '. /etc/profile.d/modules.sh; module load jdk;'
+        '''java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar filter "( ( FILTER =~ '2') | ( FILTER =~ '3') ) && ( ! (Intersection_region = '0') )" {input} > {params};'''
+        'perl ./modules/vcfFilter_count_base_change.pl {params} {output}'
 
 rule postcalling_qc_table:
     input:
-        getReport
+        postcalling_qc_dir + '/variants_annotated_basechange.txt'
     output:
         variant = postcalling_qc_dir + '/titv.txt',
-        lowqual_basechange = postcalling_qc_dir + '/low_qual_basechange.txt',
-        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.txt', group = GROUPS) 
+        basechange = postcalling_qc_dir + '/basechange_all.txt' 
     params:
-        postcalling_qc_dir
+        outdir = postcalling_qc_dir,
+        cov_report = coverage_dir + '/Final_merged_coverage.txt',
+        tmp = postcalling_qc_dir + '/titv_tmp.txt'
     shell:
-        'sh ./post_calling_table.sh {input} {params}'
+        '. /etc/profile.d/modules.sh; module load python/2.7.5 glu;'
+        'sh ./modules/post_calling_table.sh {input} {params.outdir};'
+        'glu util.join -1 SAMPLE -2 ANALYSISID -j inner {output.variant} {params.cov_report} -o {params.tmp}:c=SAMPLE,TOTAL,TI,TV,RATIO,CACO,COV; mv {params.tmp} {output.variant}'
 
 rule variant_count_plot:
     input:
         variant = postcalling_qc_dir + '/titv.txt'
     output:
         total_count = postcalling_qc_dir + '/variant_count.png',
+        total_outlier = postcalling_qc_dir + '/variant_outlier10.txt',
         titv_ratio = postcalling_qc_dir + '/titv_ratio.png',
+        titv_outlier = postcalling_qc_dir + '/titv_outlier10.txt',
         R = postcalling_qc_dir + '/variant_count.R',
         Rout = postcalling_qc_dir + '/variant_count.R.out'
     run:
@@ -48,7 +55,8 @@ rule variant_count_plot:
         data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t" )
         colors <- c(rgb(0, 0, 1, .3), rgb(1, 0, 0, .3), rgb(.75, .75, .75, .3), rgb(0, 1, 0, .3))
         png("''' + str(output.total_count) + '''")
-        plot(data$TOTAL, xlab="Samples", ylab="Total Variant Count", pch=20,ylim=c(100000,250000), col= colors[data$CACO])
+        plot(data$TOTAL, xlab="Samples", ylab="Total Variant Count", pch=20, col= colors[data$CACO])
+        title(main= "Total Variant Count",sub= "", cex=0.6)
         legend("topright", legend = c("Cases", "Controls"), col = c("blue", "red"), pch = 19, cex=0.7, bty="n")
         dev.off()
         png("''' + str(output.titv_ratio) + '''")
@@ -59,7 +67,13 @@ rule variant_count_plot:
         abline(h=ave_ratio+sd_ratio,col="blue")
         abline(h=ave_ratio-sd_ratio,col="blue")
         legend("topright", legend = c("Cases", "Controls"), col = c("blue", "red"), pch = 19, cex=0.7, bty="n")
-        dev.off()		
+        dev.off()
+        sink("''' + str(output.total_outlier) + '''")
+        print(head(data[order(data$TOTAL),][,c(1:2,5,7)],10))
+        sink()  
+        sink("''' + str(output.titv_outlier) + '''")
+        print(head(data[order(data$RATIO),][,c(1,3:5)],10))
+        sink()  
         '''
         with open(output.R, 'w') as R:
             R.write(rTxt)
@@ -84,21 +98,46 @@ rule lowqual_basechange_plot:
             R.write(rTxt)
         shell('R --vanilla < {output.R} > {output.Rout}')
 
+#not working with gcc/4.8.4
 rule basechange_group_plot:
     input:
-        postcalling_qc_dir + '/basechange_{group}.txt'
+        postcalling_qc_dir + '/basechange_all.txt'
     output:
-        basechange_group = postcalling_qc_dir + '/basechange_{group}.png',
-        R = postcalling_qc_dir + '/basechange_{group}.R',
-        Rout = postcalling_qc_dir + '/basechange_{group}.R.out'
+        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS),
+        basechange_all = postcalling_qc_dir + '/basechange_all.png',        
+        R = postcalling_qc_dir + '/basechange.R',
+        Rout = postcalling_qc_dir + '/basechange.R.out'
+    params:
+        postcalling_qc_dir + '/basechange_'
     run:
         rTxt = '''
-        data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t" )
-        png("''' + str(output.basechange_group) + '''")
-        matplot(t(data[,2:ncol(data)]),xlab= "Quality Categories", ylab= "Variant Number", type = c("b"),pch=20,col = data[,1]) #plot
-        legend("topleft", legend = data[,1], col=data[,1], pch=20)
-        axis(1, at=2:ncol(data), labels=colnames(data[,2:ncol(data)]),las=2)
+        library(ggplot2)
+        library(plyr)
+        library(reshape2)
+        library(viridisLite)
+        library(viridis)
+        data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t", row.names=NULL )	
+        png("''' + str(output.basechange_all) + '''")
+        meltdata = melt(data = data, id.vars = c("GROUP","BASE"),measure.vars = c("X0.90", "X90.400", "X400.2400", "X2400.6000", "X6000.12000", "X12000.20000", "X20000.36000", "X36000.60000", "X60000.100000", "X100000.1600000", "X.1600000"))
+        gg <- ggplot(meltdata, aes(x=factor(variable, levels=unique(variable)), y=value,color=BASE))
+        gg + geom_point(size = 0.5) +
+        labs(x = "Quality Intervals", y = "Variant Count") +
+        theme(axis.text.x=element_text(size=4,angle=45))+
+        facet_wrap(GROUP~.)
         dev.off()
+        for (val in unique(meltdata$GROUP))
+        {
+            data=meltdata[which(meltdata$GROUP==val), ] 
+            filename=paste("''' + str(params) + '''", val, '.png',sep='')
+            title=paste(val,'Base Change') 
+            gg <- ggplot(data, aes(x=factor(variable, levels=unique(variable)), y=value,color=BASE, group = BASE)) +
+            geom_point(size = 0.5) +geom_line() +
+            labs(x = "Quality Intervals", y = "Variant Count") +
+            theme(axis.text.x=element_text(angle=45))+ 
+            ggtitle(title)+
+            theme(plot.title = element_text(hjust = 0.5))
+            ggsave(filename,plot=gg)
+        }
         '''
         with open(output.R, 'w') as R:
             R.write(rTxt)

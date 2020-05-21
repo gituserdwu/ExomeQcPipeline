@@ -4,27 +4,32 @@ import sys
 import os
 from glob import iglob
 
-project = config['project']
+# rule all:
+   # input:
+       # gender_check_dir + '/gender_check.png'
+       
+# gender_check_dir = 'gender_check'    
+# SAMPLES=[]
 
-gender_check_dir = 'gender_check'
-bamDir = project + '/../bam_location/*'
+# for bam in glob.iglob(bam_location + '/*/*.bam', recursive=True):
+    # samp = os.path.basename(bam)[:-4]
+    # SAMPLES.append(os.path.basename(bam)[:-4])
+rule XYratio_single:
+    input:
+        getBam
+    output:
+        expand(project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt', sample = SAMPLES)
+    shell:
+        '. /etc/profile.d/modules.sh; module load samtools;'
+        '''Xcount=$(samtools view {{input}} | awk '$3~/chrX/ {{print}}' | wc -l);'''
+        '''Ycount=$(samtools view {{input}} | awk '$3~/chrY/ {{print}}' | wc -l);'''
+        'echo -e "{wildcards.sample}\t${Xcount}\t${Ycount}" > {output}'
 
-def getManifest(wildcards):
-    return glob.iglob(project + '/../Manifest/*.csv', recursive=False)
-
-SAMPLES=[]
-
-for bam in glob.iglob(bamDir + '/*.bam', recursive=True):
-    samp = os.path.basename(bam)[:-4]
-    SAMPLES.append(os.path.basename(bam)[:-4])
-
-#rule all:
-#    input:
-
+    
 rule XYratio_table:
     input:
-        count = expand(project + '/gender_concordance/intermediate_files/counts/{sample}_X_Y_COUNTS.txt', sample = SAMPLES),
-        Manifest = getManifest
+        count = expand(project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt', sample = SAMPLES),
+        Manifest = manifest
     output:
         gender_check_dir + '/XYratio_table.txt'
     params:
@@ -39,18 +44,46 @@ rule XYratio_table:
         mergedfile.close()
         genderDic = {}
 #        with open(params.Manifest[0], 'r') as manifest: get errors of read just the first letter of the path, turn out only input is list, params is suppose to be string and don't need to add [0]
-        with open(input.Manifest[0], 'r') as manifest:
+        with open(input.Manifest, 'r') as manifest:
             next(manifest)
             for line in manifest:
                key = line.split(',')[6] + '_' + line.split(',')[12]
                genderDic[key] = line.split(',')[9]
         with open(params.merged_table, 'r') as infile, open(output[0], 'w') as outfile:
-            outfile.write( 'SAMPLE\tChrX\tChrY\tIDENTIFILER GENDER\tYXratio' + '\n' )
+            outfile.write( 'SAMPLE\tChrX\tChrY\tIDENTIFILER_GENDER\tYXratio' + '\n' )
             for line in infile:
                 ratio = float(line.split('\t')[2])/float(line.split('\t')[1])
                 value = genderDic.get(line.split('\t')[0].strip())
                 if value is not None:
                     outfile.write(line.strip().replace("F","1") + '\t' + value + '\t' + str(ratio) + '\n')
 
-
+rule gender_plot:
+    input:
+        gender_check_dir + '/XYratio_table.txt'
+    output:
+        png_gender = gender_check_dir + '/gender_check.png',
+        outlier_table = gender_check_dir + '/gender_outlier.txt',
+        R = gender_check_dir + '/gender_check.R',
+        Rout = gender_check_dir + '/gender_check.R.out'
+    run:
+        rTxt = '''
+        data_gender <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_gender) + '''", 6.5, 6.5, "in", res = 300)
+        colors <- c("F"=rgb(0, 0, 1, .3), "U"=rgb(1, 0, 0, .3), "M"=rgb(0, 1, 0, .3),"OTHER"=rgb(.75, .75, .75, .3) )
+        sortData <- data_gender[with(data_gender, order(data_gender$IDENTIFILER_GENDER,data_gender$YXratio)), ]
+        plot(sortData$YXratio, xlab="Subjects", ylab="ChrY/ChrX Ratio", pch=20, col= colors[sortData$IDENTIFILER_GENDER], cex = 0.5)
+        legend("topleft", legend = c("Female", "Male", "Unknown"), col = c("blue", "red", "green"), pch = 19, cex=0.7, bty="n")
+        maledata <- subset(sortData, IDENTIFILER_GENDER==3, select=YXratio)
+        femaledata <- subset(sortData, IDENTIFILER_GENDER==1, select=YXratio)
+        sd(sortData$YXratio)
+        abline(h=colMeans(femaledata),col=colors[1])
+        abline(h=colMeans(maledata),col=colors[3])
+        outlier <- subset(sortData, IDENTIFILER_GENDER==3&YXratio<=colMeans(femaledata)+sd(femaledata$YXratio)|IDENTIFILER_GENDER==1&YXratio>=colMeans(maledata)-sd(maledata$YXratio))
+        sink("''' + str(output.outlier_table) + '''")
+        print(outlier[,c(1,4,5)])
+        sink()      
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
         

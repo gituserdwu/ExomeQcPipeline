@@ -4,10 +4,12 @@ project = config['project']
 
 precalling_dir = 'precalling_qc'
 
-rule all:
-    input:
-        precalling_dir + '/seq_artifact.png',
-        precalling_dir + '/lowest_predatpter_baitbias_sample.csv'
+#rule all:
+#    input:
+#        png_aritifact = precalling_dir + '/seq_artifact.png',
+#        png_foldeighty = precalling_dir + '/fold80.png',
+#        png_oxidation = precalling_dir + '/oxidation.png',
+#        low_score_sample = precalling_dir + '/lowest_predatpter_baitbias_sample.csv'
 
 rule pre_calling_plot:
     input:
@@ -15,16 +17,26 @@ rule pre_calling_plot:
     output:
         png_aritifact = precalling_dir + '/seq_artifact.png',
         png_foldeighty = precalling_dir + '/fold80.png',
+        png_oxidation = precalling_dir + '/oxidation.png',
         R = precalling_dir + '/precalling_qc_plot.R',
         Rout = precalling_dir + '/precalling_qc_plot.R.out'
     run:
         rTxt = '''
+        library(ggplot2)
         data_precalling <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
         png("''' + str(output.png_aritifact) + '''")
         boxplot(data_precalling$LOWEST_PREADATPER_TOTAL_QSCORE,data_precalling$LOWEST_BAITBIAS_TOTAL_QSCORE, names = c("Preadapter Artifact", "Baitbias Artifact"),ylab = "LOWEST_TOTAL_QSCORE", main = "CollectSequencingArtifactMetrics",  outline=FALSE)
         dev.off()
+        png("''' + str(output.png_oxidation) + '''")
+        boxplot(data_precalling$OXIDATION_Q_AVE,data_precalling$LOWEST_OXIDATION_Q, names = c("Average Oxidation Qual", "Lowest Oxidation Qual"),ylab = "LOWEST_TOTAL_QSCORE", main = "CollectOxidationMetrics",  outline=FALSE, ylab="Qual Score")
+        dev.off()
+        data_precalling2<-data_precalling[!(data_precalling$FOLD_80_BASE_PENALTY=="?"),]
         png("''' + str(output.png_foldeighty) + '''")
-        boxplot(as.numeric(as.character(data_precalling$FOLD_80_BASE_PENALTY)),ylab = "Fold 80 Penalty Score", main = "CollectFold80Metrics",  outline=TRUE)
+        ggplot(data_precalling2, aes(as.numeric(as.character(FOLD_80_BASE_PENALTY)))) + 
+        geom_histogram() +
+        scale_y_continuous(trans="log2") +
+        labs(x = "Fold 80 Penalty score", y = "subject count(log2 transformed)") +
+        theme_bw()
         dev.off()
         '''
         with open(output.R, 'w') as R:
@@ -37,4 +49,4 @@ rule count_lowest_predatpter_baitbias_sample:
     output:
         precalling_dir + '/lowest_predatpter_baitbias_sample.csv'
     shell:
-        '. /etc/profile.d/modules.sh; sh ./count_lowest_predatpter_baitbias_sample.sh {input} {output}'
+        '. /etc/profile.d/modules.sh; sh modules/count_lowest_predatpter_baitbias_sample.sh {input} {output}'

@@ -1,25 +1,31 @@
 #!/usr/bin/python
 import os
 
-outName = os.path.basename(os.path.dirname(config['project']))
+#outName = os.path.basename(os.path.dirname(config['project']))
 
 rule word_doc:
     input:
         template = config['doc_template'],
         contamination_plot = 'bamContamination/bam_contamination_rate.png',
+        top10_contamination = 'bamContamination/top10_contamination_rate.txt',
         aveCov_plot = 'coverage/Average_Coverage_caco.png', 
-#        mosdepth_plot = 'coverage/mosdepth_total_dist.html',
-        lane_dup_plot = 'deduplication/lane_dup_rate.png',
+        sex_plot = 'gender_check/gender_check.png',
+        ancestry_plot = 'laser/Results_on_HGDP938.png',
         subject_dup_plot = 'deduplication/subject_dup_rate.png',
+        top10_dup = 'deduplication/top10_dup_rate.txt',
         fold80_plot = 'precalling_qc/fold80.png',
         seqArtifact_plot = 'precalling_qc/seq_artifact.png',
-        seqArtifact_samp_count = 'precalling_qc/lowest_predatpter_baitbias_sample.csv',		
-        summary_ccs_ue = 'exomeCQA/summary_ccs_ue.csv',
+        oxidation_plot = 'precalling_qc/oxidation.png',
+        summary_ue = 'exomeCQA/summary_ue.txt',		
+        summary_ccs = 'exomeCQA/summary_ccs.txt',
         ccs_plot = 'exomeCQA/cohort_coverage_sparseness.png',
         ue_plot = 'exomeCQA/unevenness.png',
+        top10_ue = 'exomeCQA/top10_ue.txt',
         total_count = 'postcalling_qc/variant_count.png',
+        botton10_count = 'postcalling_qc/variant_outlier10.txt',
         titv_ratio = 'postcalling_qc/titv_ratio.png',
-        lowqual_basechange = 'postcalling_qc/lowqual_basechange.png'
+        botton10_titv = 'postcalling_qc/titv_outlier10.txt',
+        lowqual_basechange = 'postcalling_qc/basechange_all.png'
     output:
         doc = 'word_doc/' + outName + '_QC_Report.docx', 
         R = 'word_doc/doc.R',
@@ -28,11 +34,9 @@ rule word_doc:
         rTxt = '''library(officer)
 library(magrittr)
 library(flextable)
-seqArtifact_samp_count <- read.csv("''' + input.seqArtifact_samp_count + '''", header = FALSE)
-table_precalling <- data.frame(seqArtifact_samp_count)
-names(table_precalling) <- c("Tpye", "1st Lowest", "1st Count", "2nd Lowest", "2nd Count", "3rd Lowest" ,"3rd Count")
+table_1 <- read.table("''' + input.top10_dup + '''", header = TRUE)
 
-ft_1 <- regulartable(table_precalling, col_keys = names(table_precalling)) %>%
+ft_1 <- regulartable(table_1, col_keys = names(table_1)) %>%
     fontsize(size = 8, part = "all") %>%
     fontsize(i = 1, size = 10, part = "header") %>%
     color(i = 1, color = "#007FA6", part = "header") %>%
@@ -40,16 +44,9 @@ ft_1 <- regulartable(table_precalling, col_keys = names(table_precalling)) %>%
     autofit()
 ft_1 <- align(ft_1, align = "center")
 
-double_format <- function(x){
-  sprintf("%.2f", x)
-}
+table_2 <- read.table("''' + input.top10_contamination + '''", header = TRUE)
 
-summary_ccs_ue <- read.csv("''' + input.summary_ccs_ue + '''", header=TRUE,row.names=1)
-table_exomeCQA <- data.frame(summary_ccs_ue)
-names(table_exomeCQA) <- c( "Min", "1st.Qu", "Median", "Mean", "3rd.Qu", "Max")
-
-ft_2 <- regulartable(table_exomeCQA, col_keys = names(table_exomeCQA)) %>%
-    set_formatter("Min" = double_format, "1st.Qu" = double_format, "Median" = double_format, "Mean" = double_format, "3rd.Qu" = double_format, "Max" = double_format) %>%
+ft_2 <- regulartable(table_2, col_keys = names(table_2)) %>%
     fontsize(size = 8, part = "all") %>%
     fontsize(i = 1, size = 10, part = "header") %>%
     color(i = 1, color = "#007FA6", part = "header") %>%
@@ -57,34 +54,119 @@ ft_2 <- regulartable(table_exomeCQA, col_keys = names(table_exomeCQA)) %>%
     autofit()
 ft_2 <- align(ft_2, align = "center")
 
+summary_ue <- read.table("''' + input.summary_ue + '''", header = TRUE, fill=TRUE)
+min = summary_ue$Min.
+q1 = summary_ue$X1st
+med = summary_ue$Qu.
+mean = summary_ue$Median
+q3 = summary_ue$Mean
+max=summary_ue$X3rd
+table_3a <- data.frame(min=min, q1=q1, med=med, mean=mean, q3=q3, max=max)
+
+ft_3a <- regulartable(table_3a, col_keys = names(table_3a)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_3a <- align(ft_3a, align = "center")
+
+double_format <- function(x){
+  sprintf("%.2f", x)
+}
+
+summary_ccs <- read.table("''' + input.summary_ccs + '''", header=TRUE, fill=TRUE)
+min = summary_ue$Min.
+q1 = summary_ue$X1st
+med = summary_ue$Qu.
+mean = summary_ue$Median
+q3 = summary_ue$Mean
+max=summary_ue$X3rd
+table_3b <- data.frame(min=min, q1=q1, med=med, mean=mean, q3=q3, max=max)
+
+ft_3b <- regulartable(table_3b, col_keys = names(table_3b)) %>%
+    set_formatter("Min" = double_format, "1st.Qu" = double_format, "Median" = double_format, "Mean" = double_format, "3rd.Qu" = double_format, "Max" = double_format) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_3b <- align(ft_3b, align = "center")
+
+table_5a <- read.table("''' + input.botton10_count + '''", header = TRUE)
+
+ft_5a <- regulartable(table_5a, col_keys = names(table_5a)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_5a <- align(ft_5a, align = "center")
+
+table_5b <- read.table("''' + input.botton10_titv + '''", header = TRUE)
+
+ft_5b <- regulartable(table_5b, col_keys = names(table_5b)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_5b <- align(ft_5b, align = "center")
+
+table_4 <- read.table("''' + input.top10_ue + '''", header = TRUE)
+
+ft_4 <- regulartable(table_4, col_keys = names(table_4)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_4 <- align(ft_4, align = "center")
 
 my_doc <- read_docx(path = "''' + input.template + '''")  %>%
-    cursor_reach(keyword = "Figure 1. sorted contamination rate by sample") %>%
-    slip_in_img(src = "''' + input.contamination_plot + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 1. the scatter plot for all exome samples, case control separated") %>%
-    slip_in_img(src = "''' + input.aveCov_plot + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 2. the mosdepth coverage distribution plot") %>%
-
-    cursor_reach(keyword = "Figure 3. the boxplot for all Fold 80 base panelty for samples") %>%
-    slip_in_img(src = "''' + input.fold80_plot + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 5. the boxplot of Lowest Preadapter and Baitbias Total Score for all samples") %>%
-    slip_in_img(src = "''' + input.seqArtifact_plot + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Table1.Top 3 lowest total preadatper and baitbias score base changes and number of samples having the base change as the potential artifact") %>%
-    body_add_flextable(value = ft_1) %>%	
-    cursor_reach(keyword = "Table2. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for all exon regions") %>%
-    body_add_flextable(value = ft_2) %>%
-    cursor_reach(keyword = "Figure 6. the boxplot of UE score and CSS Score for all exons") %>%
-    slip_in_img(src = "''' + input.ccs_plot + '''", width = 3, height = 3, pos = "before") %>%
-    slip_in_img(src = "''' + input.ue_plot + '''", width = 3, height = 3, pos = "before") %>%
-    cursor_reach(keyword = "Figure 8a. lane level duplication rate by sample") %>%
-    slip_in_img(src = "''' + input.lane_dup_plot + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 8b. subject level duplication rate by sample") %>%
+    cursor_reach(keyword = "Figure 1. subject level duplication rate by number of lanes") %>%
     slip_in_img(src = "''' + input.subject_dup_plot + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 9a. Ensemble filtered variant count by sample") %>%
+    cursor_reach(keyword = "residual duplication rate after lane dup removed.") %>%
+    body_add_flextable(value = ft_1) %>%
+    cursor_reach(keyword = "Figure 2. sorted contamination rate by subjects") %>%
+    slip_in_img(src = "''' + input.contamination_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Table 2.  10 samples with highest contamination rate") %>%
+    body_add_flextable(value = ft_2) %>%
+
+    cursor_reach(keyword = "Figure 3. coverage scatter plot for all exome samples, with cases and controls separated") %>%
+    slip_in_img(src = "''' + input.aveCov_plot + '''", width = 5, height = 5, pos = "before") %>%
+    
+    cursor_reach(keyword = "Table 3a. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for US score") %>%
+    body_add_flextable(value = ft_3a) %>%	
+    cursor_reach(keyword = "Table 3b. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for CCS score") %>%
+    body_add_flextable(value = ft_3b) %>%
+        
+    cursor_reach(keyword = "Figure 4. the histogram of UE score and CCS Score for all sample") %>%
+    slip_in_img(src = "''' + input.ccs_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
+    slip_in_img(src = "''' + input.ue_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
+    cursor_reach(keyword = "Table 4.  10 regions with highest Unevenness Score") %>%
+    body_add_flextable(value = ft_4) %>%
+    
+    cursor_reach(keyword = "Figure 5. boxplot for all Fold 80 base penalty for samples") %>%
+    slip_in_img(src = "''' + input.fold80_plot + '''", width = 5, height = 5, pos = "before") %>%    
+    cursor_reach(keyword = "Figure 6. boxplot of average oxidation q score and lowest oxidation q score") %>%
+    slip_in_img(src = "''' + input.oxidation_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 7. boxplot of Lowest Preadapter and Baitbias Total Score for all samples") %>%
+    slip_in_img(src = "''' + input.seqArtifact_plot + '''", width = 5, height = 5, pos = "before") %>%
+
+    cursor_reach(keyword = "Figure 8. ChrY/ChrX reads ratio for all subjects") %>%
+    slip_in_img(src = "''' + input.sex_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 9. Laser ancestry estimation for all subjects: top 2 plots showing reference only, bottom 2 plots showing study subjects, black procrusted to reference samples, grey.") %>%
+    slip_in_img(src = "''' + input.ancestry_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 10a. Ensemble filtered variant count by sample") %>%
     slip_in_img(src = "''' + input.total_count + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 9b. Ensemble filtered variant ti/tv ratio by sample") %>%
+    cursor_reach(keyword = "Table 5a. 10 samples with lowest variant count ") %>%
+    body_add_flextable(value = ft_5a) %>%	
+    cursor_reach(keyword = "Table 5b. 10 samples with lowest ti/tv ratio") %>%
+    body_add_flextable(value = ft_5b) %>%
+    cursor_reach(keyword = "Figure 10b. Ensemble filtered variant ti/tv ratio by sample") %>%
     slip_in_img(src = "''' + input.titv_ratio + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 9c. Low quality base change count by sample") %>%
+    cursor_reach(keyword = "Figure 10c. base change counts per disease group") %>%
     slip_in_img(src = "''' + input.lowqual_basechange + '''", width = 5, height = 5, pos = "before") 
 print(my_doc, target = "''' + output.doc + '''")
 '''
