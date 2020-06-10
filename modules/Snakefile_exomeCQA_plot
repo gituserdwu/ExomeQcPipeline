@@ -1,8 +1,8 @@
 #!/usr/bin/python
 #need module load gcc zlib to run qqplot
-project = config['project']
+#project = config['project']
 
-exomeCQA_dir = 'exomeCQA'
+#exomeCQA_dir = 'exomeCQA'
 
 #rule all:
 #    input:
@@ -13,8 +13,8 @@ exomeCQA_dir = 'exomeCQA'
 		
 rule exomeCQA_exon_score:
     input:
-        exon_input = project + '/exomeCQA_exon.chrALL',
-        gene_input = project + '/exomeCQA_gene.chrALL'
+        exon_input = exomeCQAexonReport,
+        gene_input = exomeCQAgeneReport
     output:
         exon_output = exomeCQA_dir + '/exomeCQA_exon.txt',
         gene_output = exomeCQA_dir + '/exomeCQA_gene.txt'

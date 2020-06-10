@@ -14,18 +14,18 @@ from glob import iglob
 # for bam in glob.iglob(bam_location + '/*/*.bam', recursive=True):
     # samp = os.path.basename(bam)[:-4]
     # SAMPLES.append(os.path.basename(bam)[:-4])
+
 rule XYratio_single:
     input:
         getBam
     output:
-        expand(project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt', sample = SAMPLES)
+        project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt' 
     shell:
         '. /etc/profile.d/modules.sh; module load samtools;'
         '''Xcount=$(samtools view {{input}} | awk '$3~/chrX/ {{print}}' | wc -l);'''
         '''Ycount=$(samtools view {{input}} | awk '$3~/chrY/ {{print}}' | wc -l);'''
         'echo -e "{wildcards.sample}\t${Xcount}\t${Ycount}" > {output}'
-
-    
+   
 rule XYratio_table:
     input:
         count = expand(project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt', sample = SAMPLES),

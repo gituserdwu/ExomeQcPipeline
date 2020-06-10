@@ -1,0 +1,17 @@
+project: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/QC
+manifest: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/Manifest/SR0436-004-ANALYSIS-MANIFEST.csv
+exomCQA_gene: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/QC/exomeCQA_gene.chrALL
+exomCQA_exon: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/QC/exomeCQA_exon.chrALL
+precalling_report: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/QC/pre_calling_qc_report.txt
+doc_template: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/QC/ExomeQcPipeline/ExomeQcPipeline_Template_interim.docx
+ref: /DCEG/CGF/Resources/Data/genome/hg19_canonical_correct_chr_order.fa
+capturekit: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/BED_files/Chernobyl-MM_capture_targets.bed
+#/DCEG/Projects/Exome/SequencingData/BED_FILES/NV3UTR_NV3_nopadding_corrected.bed
+population_file: modules/HGDP/example.id #NA when no population file can be provided
+
+ensemble_vcf: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/Ensemble/variants/variants_annotated.vcf
+bam_location: /DCEG/Projects/Exome/builds/build_SR0436-004_Ukrainian_Trio_Parents_UMI_25293/bam_location_germline
+
+somatic: FALSE
+BamMatcher: ~/tools/bam-matcher/bam-matcher.py
+pairs: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Manifest/pairs.txt
