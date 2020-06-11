@@ -22,9 +22,9 @@ rule XYratio_single:
         project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt' 
     shell:
         '. /etc/profile.d/modules.sh; module load samtools;'
-        '''Xcount=$(samtools view {{input}} | awk '$3~/chrX/ {{print}}' | wc -l);'''
-        '''Ycount=$(samtools view {{input}} | awk '$3~/chrY/ {{print}}' | wc -l);'''
-        'echo -e "{wildcards.sample}\t${Xcount}\t${Ycount}" > {output}'
+        '''Xcount=$(samtools view {input} | awk '$3~/chrX/ {{print}}' | wc -l);'''
+        '''Ycount=$(samtools view {input} | awk '$3~/chrY/ {{print}}' | wc -l);'''
+        'echo -e "{wildcards.sample}\t${{Xcount}}\t${{Ycount}}" > {output}'
    
 rule XYratio_table:
     input:

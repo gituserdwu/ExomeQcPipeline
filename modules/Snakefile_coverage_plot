@@ -23,7 +23,7 @@ rule mosdepth:
 
 rule average_depth_caco:
     input:
-        getReport
+        project + '/pre_calling_qc_report.txt'
     output:
         coverage_dir + '/Average_Coverage_caco.txt'
     run:
@@ -31,8 +31,8 @@ rule average_depth_caco:
             out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
             next(f)
             for line in f:
-                SAMPLE=line.split('\t')[3]
-                DEPTH=line.split('\t')[25].rstrip()
+                SAMPLE=line.split('\t')[0]
+                DEPTH=line.split('\t')[24].rstrip()
                 if not any (CONTROL in line for CONTROL in CONTROLS):
                     out.write( SAMPLE + '\tCASE\t' + DEPTH + '\n' )
                 else:
