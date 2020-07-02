@@ -28,8 +28,7 @@ contamination_dir = 'bamContamination'
 ancestry_check_dir = 'laser'
 exomeCQA_dir = 'exomeCQA'
 hgdpDir = 'modules/HGDP'
-deduplication_dir = 'deduplication'
-precalling_dir = 'precalling_qc'
+
 
 GROUPS=[]
 SAMPLES = []
@@ -96,24 +95,58 @@ if config['somatic']:
     pair_manifest = config['pairs']
     bamMatcher_dir = 'bamMatcher'
     bamMatcherExe = config['BamMatcher']
-    include: 'modules/Snakefile_bam_matcher'
-    
-include: 'modules/Snakefile_ancestry_plot'
-#include: 'modules/Snakefile_ancestry_plot_by_group'
-include: 'modules/Snakefile_contamination_plot'
-include: 'modules/Snakefile_coverage_plot'
-include: 'modules/Snakefile_duplication_plot'
-include: 'modules/Snakefile_exomeCQA_plot'
-include: 'modules/Snakefile_gender_plot'
-include: 'modules/Snakefile_pre_calling_plot'
+
 if config['somatic']:
+    if config['ancestry_check']:   
+        include: 'modules/Snakefile_ancestry_plot'
+    if config['matcher_check']:    
+        include: 'modules/Snakefile_bam_matcher'
+    if config['contamination_check']:           
+        include: 'modules/Snakefile_contamination_plot'
+    if config['coverage_check']:           
+        include: 'modules/Snakefile_coverage_plot'
+    if config['duplication_check']:           
+        include: 'modules/Snakefile_duplication_plot'
+    if config['exomeCQA_check']:           
+        include: 'modules/Snakefile_exomeCQA_plot'
+    if config['gender_check']:           
+        include: 'modules/Snakefile_gender_plot'
+    if config['pre_calling_check']:           
+        include: 'modules/Snakefile_pre_calling_plot'
+    if config['post_calling_check']:  
     include: 'modules/Snakefile_postcalling_plot_somatic'
-else:    
-    include: 'modules/Snakefile_postcalling_plot'
-include: 'modules/Snakefile_doc'
-    
+else:
+    if config['ancestry_check']:   
+        include: 'modules/Snakefile_ancestry_plot'
+    if config['contamination_check']:           
+        include: 'modules/Snakefile_contamination_plot'
+    if config['coverage_check']:           
+        include: 'modules/Snakefile_coverage_plot'
+    if config['duplication_check']:           
+        include: 'modules/Snakefile_duplication_plot'
+    if config['exomeCQA_check']:           
+        include: 'modules/Snakefile_exomeCQA_plot'
+    if config['gender_check']:           
+        include: 'modules/Snakefile_gender_plot'
+    if config['pre_calling_check']:           
+        include: 'modules/Snakefile_pre_calling_plot'
+    if config['post_calling_check']:           
+        include: 'modules/Snakefile_postcalling_plot'      
+        
 rule all:
     input:
-        bamMatcher_dir + '/bam_matcher_report_all.txt' if config['somatic'] else [],
-        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS) if not config['somatic'] else [], 
-        word_report = 'word_doc/' + outName + '_QC_Report.docx'
+        ancestry_check_dir + '/Results_on_HGDP938.png' if config['ancestry_check'] else [],
+        bamMatcher_dir + '/bam_matcher_report_all.txt' if ( config['somatic'] and config['matcher_check'] ) else [],
+        contamination_dir + 'bam_contamination_rate.png' if config['contamination_check'] else [],
+        coverage_dir + 'Average_Coverage_caco.png' if config['coverage_check'] else [],
+        deduplication_dir + 'subject_dup_rate.png' if config['duplication_check'] else [],
+        exomeCQA_dir +'cohort_coverage_sparseness.png' if config['exomeCQA_check'] else [],
+        exomeCQA_dir + 'unevenness.png' if config['exomeCQA_check'] else [],
+        gender_check_dir + '/gender_check.png' if config['gender_check'] else [],
+        precalling_dir + 'fold80.png' if config['pre_calling_check'] else [],
+        precalling_dir + 'seq_artifact.png' if config['pre_calling_check'] else [],
+        precalling_dir + 'oxidation.png' if config['pre_calling_check'] else [],
+        postcalling_qc_dir + '/basechange.png' if config['post_calling_check'] else [],
+        postcalling_qc_dir + '/variant_count.png' if ( config['post_calling_check'] and config['somatic'] ) else [],
+        postcalling_qc_dir + '/titv_ratio.png' if ( config['post_calling_check'] and config['somatic'] ) else []
+ 
