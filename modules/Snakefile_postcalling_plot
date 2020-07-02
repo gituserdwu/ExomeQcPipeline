@@ -60,7 +60,7 @@ rule variant_count_plot:
         legend("topright", legend = c("Cases", "Controls"), col = c("blue", "red"), pch = 19, cex=0.7, bty="n")
         dev.off()
         png("''' + str(output.titv_ratio) + '''")
-        plot(data$RATIO, xlab="Samples", ylab="Ti/TV Ratio", pch=20,col= colors[data$CACO])
+        plot(data$RATIO, xlab="Samples", ylab="Ti/TV Ratio", pch=20,col= colors[data$CACO], ylim=c(1.0, 3.0))
         ave_ratio=mean(data$RATIO)
         sd_ratio=sd(data$RATIO)*3
         abline(h=ave_ratio)

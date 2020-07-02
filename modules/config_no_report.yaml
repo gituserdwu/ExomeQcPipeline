@@ -17,3 +17,13 @@ bam_location: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/bam
 somatic: TRUE
 BamMatcher: ~/tools/bam-matcher/bam-matcher.py
 pairs: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Manifest/pairs.txt
+
+ancestry_check: TRUE
+bam-matcher_check: TRUE
+contamination_check: TRUE
+coverage_check: TRUE
+duplication_check: TRUE
+exomeCQA_check: TRUE
+gender_check: TRUE
+pre_calling_check: TRUE
+postcalling_check: TRUE

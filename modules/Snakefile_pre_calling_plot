@@ -2,7 +2,6 @@
 
 project = config['project']
 
-precalling_dir = 'precalling_qc'
 
 #rule all:
 #    input:

@@ -5,13 +5,13 @@ import os
 rule table_sample_summary:
     input:
         #single = lambda wildcards: [bam_location + '/' + group + '/' + item for item in sampleGroupDict.keys() + '.bam']
-        single = lambda wildcards: [bam_location + '/' + sampleGroupDict[item] + '/' + item + '.bam' for item in sampleGroupDict.keys()]
+        single = lambda wildcards: [bam_location + '/' + sampleGroupDict[item] + '/' + item + '.bam' for item in sampleGroupDict.keys()] #need to use for loop to include all sample single bam files
     output:
         'word_doc/sample_summary.txt'
     run:
         GroupDict = {}
         with open(output[0], 'w') as outfile: 
-            outfile.write( 'DISEASE GROUP\tSUBJECT COUNTS' + '\n' )
+            outfile.write( 'DISEASE_GROUP\tSUBJECT_COUNTS' + '\n' )
             for fname in input.single:   
                 #with open(fname, 'r') as infile: no need to open file
                 GROUP=os.path.basename(os.path.dirname(fname))
@@ -24,7 +24,7 @@ rule table_sample_summary:
 
 rule word_doc:
     input:
-        template = config['doc_template'],
+        template = config['doc_template_somatic'] if config['somatic'] else config['doc_template_germline'],
         sample_summary = 'word_doc/sample_summary.txt',
         contamination_plot = 'bamContamination/bam_contamination_rate.png',
         top10_contamination = 'bamContamination/top10_contamination_rate.txt',
@@ -41,11 +41,11 @@ rule word_doc:
         ccs_plot = 'exomeCQA/cohort_coverage_sparseness.png',
         ue_plot = 'exomeCQA/unevenness.png',
         top10_ue = 'exomeCQA/top10_ue.txt',
-        total_count = 'postcalling_qc/variant_count.png',
-        botton10_count = 'postcalling_qc/variant_outlier10.txt',
-        titv_ratio = 'postcalling_qc/titv_ratio.png',
-        botton10_titv = 'postcalling_qc/titv_outlier10.txt',
-        lowqual_basechange = 'postcalling_qc/basechange_all.png'
+        total_count = 'postcalling_qc/variant_count.png' if not config['somatic'] else [],
+        botton10_count = 'postcalling_qc/variant_outlier10.txt' if not config['somatic'] else [],
+        titv_ratio = 'postcalling_qc/titv_ratio.png' if not config['somatic'] else [],
+        botton10_titv = 'postcalling_qc/titv_outlier10.txt' if not config['somatic'] else [],
+        basechange = postcalling_qc_dir + '/basechange.png' if config['somatic'] else 'postcalling_qc/basechange_all.png'
     output:
         doc = 'word_doc/' + outName + '_QC_Report.docx', 
         R = 'word_doc/doc.R',
@@ -72,7 +72,7 @@ ft_1 <- regulartable(table_1, col_keys = names(table_1)) %>%
     color(i = 1, color = "#007FA6", part = "header") %>%
     theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
     autofit()
-ft_2 <- align(ft_2, align = "center")
+ft_1 <- align(ft_1, align = "center")
 
 table_2 <- read.table("''' + input.top10_dup + '''", header = TRUE)
 
@@ -133,25 +133,6 @@ ft_4b <- regulartable(table_4b, col_keys = names(table_4b)) %>%
     autofit()
 ft_4b <- align(ft_4b, align = "center")
 
-table_6a <- read.table("''' + input.botton10_count + '''", header = TRUE)
-
-ft_6a <- regulartable(table_6a, col_keys = names(table_6a)) %>%
-    fontsize(size = 8, part = "all") %>%
-    fontsize(i = 1, size = 10, part = "header") %>%
-    color(i = 1, color = "#007FA6", part = "header") %>%
-    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
-    autofit()
-ft_6a <- align(ft_6a, align = "center")
-
-table_6b <- read.table("''' + input.botton10_titv + '''", header = TRUE)
-
-ft_6b <- regulartable(table_6b, col_keys = names(table_6b)) %>%
-    fontsize(size = 8, part = "all") %>%
-    fontsize(i = 1, size = 10, part = "header") %>%
-    color(i = 1, color = "#007FA6", part = "header") %>%
-    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
-    autofit()
-ft_6b <- align(ft_6b, align = "center")
 
 table_5 <- read.table("''' + input.top10_ue + '''", header = TRUE)
 
@@ -211,6 +192,30 @@ my_doc <- read_docx(path = "''' + input.template + '''")  %>%
     slip_in_img(src = "''' + input.sex_plot + '''", width = 5, height = 5, pos = "before") %>%
     cursor_reach(keyword = "Figure 9. Laser ancestry estimation for all subjects: top 2 plots showing reference only, bottom 2 plots showing study subjects, black projected to reference samples, grey.") %>%
     slip_in_img(src = "''' + input.ancestry_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 10c. base change counts per disease group") %>%
+    slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before")''' 
+        if not config['somatic']:
+            rTxt += '''
+table_6a <- read.table("''' + input.botton10_count + '''", header = TRUE)
+
+ft_6a <- regulartable(table_6a, col_keys = names(table_6a)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_6a <- align(ft_6a, align = "center")
+
+table_6b <- read.table("''' + input.botton10_titv + '''", header = TRUE)
+
+ft_6b <- regulartable(table_6b, col_keys = names(table_6b)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_6b <- align(ft_6b, align = "center")
+       
     cursor_reach(keyword = "Figure 10a. Ensemble filtered variant count by sample") %>%
     slip_in_img(src = "''' + input.total_count + '''", width = 5, height = 5, pos = "before") %>%
     cursor_reach(keyword = "Table 6a. 10 samples with lowest variant count ") %>%
@@ -218,9 +223,9 @@ my_doc <- read_docx(path = "''' + input.template + '''")  %>%
     cursor_reach(keyword = "Table 6b. 10 samples with lowest ti/tv ratio") %>%
     body_add_flextable(value = ft_6b) %>%
     cursor_reach(keyword = "Figure 10b. Ensemble filtered variant ti/tv ratio by sample") %>%
-    slip_in_img(src = "''' + input.titv_ratio + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 10c. base change counts per disease group") %>%
-    slip_in_img(src = "''' + input.lowqual_basechange + '''", width = 5, height = 5, pos = "before") 
+    slip_in_img(src = "''' + input.titv_ratio + '''", width = 5, height = 5, pos = "before") %>%'''
+
+        rTxt += '''
 print(my_doc, target = "''' + output.doc + '''")
 '''
         with open(output.R, 'w')  as R:
