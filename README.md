@@ -33,5 +33,13 @@ __Report branch:__
 2. Modify all parameters in `modules/config.yaml`
 3. run `sh run_snakefile_test.sh`
 
+## Possible errors:
+
+1, Error in dyn.load(file, DLLpath = DLLpath, ...) : unable to load shared object '/mnt/nfs/gigantor/ifs/DCEG/Home/luow2/R/x86_64-pc-linux-gnu-library/3.4/farver/libs/farver.so':
+   run `module unload gcc/4.8.4`
+   
+2, Doc report generated but figures are all unviewable. 
+   run `chmod -R 775 ExomeQcPipeline`   
+
 
 
