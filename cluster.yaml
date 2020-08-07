@@ -1,0 +1,7 @@
+__default__:
+    q: long.q
+pileup2seq:
+    q: bigmem.q
+
+#exomeCQA_genInd:
+#    q: bigmem.q,seq-calling*.q

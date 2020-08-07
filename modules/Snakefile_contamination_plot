@@ -1,45 +1,9 @@
 #!/usr/bin/python
-import glob
+#import glob
 import sys
 import os
-
-# configfile: "config.yaml"
-# outName = os.path.basename(os.path.dirname(config['project']))
-# ensemble_vcf = config['ensemble_vcf']
-# bam_location = config['bam_location']
-# ensemble_dir = config['ensemble_dir']
-
-# project = config['project']
-# manifest = config['manifest']
-# refFile = config['ref']
-# populationFile = config['population_file']
-# bedFile = config['capturekit']
-# contamination_dir = 'bamContamination'
-
-# GROUPS=[]
-# SAMPLES = []
-# sampleGroupDict = {}
-# CONTROLS = ['PLCO', 'ACS', 'LC_IGC', 'EAGLE_IGC', 'CTRL', '_Normal']
-
-# with open(manifest) as f:
-    # next(f)
-    # for line in f:
-        # (group, analysisid) = [line.split(',')[i] for i in [6,12]] #with list index [6,11,12], it will throw error "list indices must be integers or slices, not tuple". Need to explicitly specify by the loop, because you cannot index list
-        # sample = group + "_" + analysisid
-        # if (sample not in SAMPLES):
-            # SAMPLES.append(sample)
-            # sampleGroupDict[sample] = group        
-            # if group not in GROUPS:            
-                # GROUPS.append(group)	
-                
-# def getBam(wildcards):
-    # (group) = sampleGroupDict[wildcards.sample]
-    # return (glob(bam_location + '/' + group + '/' + wildcards.sample + '.bam')) #Why have to use glob instead of using the string
-
-# rule all:
-    # input:
-        # contamination_dir + '/bam_contamination_rate.png'
-        
+from glob import glob
+      
 rule run_verifyBamID:
     input:
         getBam

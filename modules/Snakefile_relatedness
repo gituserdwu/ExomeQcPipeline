@@ -1,0 +1,37 @@
+#!/usr/bin/python
+#https://www.biostars.org/p/299569/ 
+#import glob
+import sys
+import os
+
+rule run_relatedness2:
+    input:
+        ensemble_vcf
+    output:
+        relatedness_dir + '/out.relatedness2'
+    shell:
+        '. /etc/profile.d/modules.sh; module load zlib vcftools;'       
+        'cd relatedness; vcftools --gzvcf {input} --relatedness2'     
+
+rule relatedness_plot:
+    input:
+        relatedness_dir + '/out.relatedness2'
+    output:
+        png_relatedness = relatedness_dir + '/relatedness.png',
+        R = relatedness_dir + '/relatedness.R',
+        Rout = relatedness_dir + '/relatedness.R.out'
+    run:
+        rTxt = '''
+        library(ggplot2)
+        data_relatedness <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_relatedness) + '''", 6.5, 6.5, "in", res = 300)
+        ggplot(data_relatedness, aes(y=INDV2, x=INDV1) ) + geom_tile(aes(fill = log(RELATEDNESS_PHI,0.5)),colour = "green") +
+        scale_fill_gradient(low = "green",high = "red") +
+        scale_fill_continuous(limits = c(1,5), breaks = c(1, 2, 3, 4,5)) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        dev.off()
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')     
+

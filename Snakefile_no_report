@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-import glob
+#import glob
 import sys
 import os
 from glob import glob
 from glob import iglob
 
-configfile: "config.yaml"
+configfile: "modules/config_no_report.yaml"
 outName = os.path.basename(os.path.dirname(config['project']))
 ensemble_vcf = config['ensemble_vcf']
 bam_location = config['bam_location']
@@ -28,7 +28,10 @@ contamination_dir = 'bamContamination'
 ancestry_check_dir = 'laser'
 exomeCQA_dir = 'exomeCQA'
 hgdpDir = 'modules/HGDP'
-
+deduplication_dir = 'deduplication'
+precalling_dir = 'precalling_qc'
+relatedness_dir = 'relatedness'
+fastqc_dir = 'fastqc'
 
 GROUPS=[]
 SAMPLES = []
@@ -53,7 +56,7 @@ def getBam(wildcards):
     (group) = sampleGroupDict[wildcards.sample]
     return (glob(bam_location + '/' + group + '/' + wildcards.sample + '.bam')) #Why have to use glob instead of using the string
 
-#print(SAMPLES)
+#print(GROUPS)
 
 def getReport(wildcards):
     return glob(project + '/*coverage_report*.txt')
@@ -65,41 +68,36 @@ def getReport(wildcards):
 ########################
 #Somatic pair call
 
-pair_manifest = config['pairs']
-bamMatcher_dir = 'bamMatcher'
-bamMatcherExe = config['BamMatcher']
-
-PAIRS = []
-tumorDict = {}
-normalDict = {}
-
-with open(pair_manifest) as f:
-    for line in f:
-        (tumor, normal, vcf) = line.split()
-        sample = os.path.basename(vcf)[:-4]
-        PAIRS.append(os.path.basename(vcf)[:-4])
-        tumorName = os.path.basename(tumor)[:-4]
-        normalName = os.path.basename(normal)[:-4]
-        tumorDict[sample] = (tumor)
-        normalDict[sample] = (normal)
-
-def get_tumor(wildcards):
-    (file) = tumorDict[wildcards.sample]
-    return file
-
-def get_normal(wildcards):
-    (file) = normalDict[wildcards.sample]
-    return file     
-
 if config['somatic']: 
     pair_manifest = config['pairs']
     bamMatcher_dir = 'bamMatcher'
     bamMatcherExe = config['BamMatcher']
+    
+    PAIRS = []
+    tumorDict = {}
+    normalDict = {}
+      
+    with open(pair_manifest) as f:
+        for line in f:
+            (tumor, normal, vcf) = line.split()
+            sample = os.path.basename(vcf)[:-4]
+            PAIRS.append(os.path.basename(vcf)[:-4])
+            tumorName = os.path.basename(tumor)[:-4]
+            normalName = os.path.basename(normal)[:-4]
+            tumorDict[sample] = (tumor)
+            normalDict[sample] = (normal)
 
-if config['somatic']:
+    def get_tumor(wildcards):
+        (file) = tumorDict[wildcards.sample]
+        return file
+
+    def get_normal(wildcards):
+        (file) = normalDict[wildcards.sample]
+        return file     
+
     if config['ancestry_check']:   
         include: 'modules/Snakefile_ancestry_plot'
-    if config['matcher_check']:    
+    if config['bam-matcher_check']:    
         include: 'modules/Snakefile_bam_matcher'
     if config['contamination_check']:           
         include: 'modules/Snakefile_contamination_plot'
@@ -109,12 +107,14 @@ if config['somatic']:
         include: 'modules/Snakefile_duplication_plot'
     if config['exomeCQA_check']:           
         include: 'modules/Snakefile_exomeCQA_plot'
+    if config['fastqc_check']:           
+        include: 'modules/Snakefile_fastqc'        
     if config['gender_check']:           
         include: 'modules/Snakefile_gender_plot'
     if config['pre_calling_check']:           
         include: 'modules/Snakefile_pre_calling_plot'
     if config['post_calling_check']:  
-    include: 'modules/Snakefile_postcalling_plot_somatic'
+        include: 'modules/Snakefile_postcalling_plot_somatic'
 else:
     if config['ancestry_check']:   
         include: 'modules/Snakefile_ancestry_plot'
@@ -126,27 +126,44 @@ else:
         include: 'modules/Snakefile_duplication_plot'
     if config['exomeCQA_check']:           
         include: 'modules/Snakefile_exomeCQA_plot'
+    if config['fastqc_check']:           
+        include: 'modules/Snakefile_fastqc'           
     if config['gender_check']:           
         include: 'modules/Snakefile_gender_plot'
     if config['pre_calling_check']:           
         include: 'modules/Snakefile_pre_calling_plot'
     if config['post_calling_check']:           
         include: 'modules/Snakefile_postcalling_plot'      
+    if config['relatedness_check']:           
+        include: 'modules/Snakefile_relatedness'
+        
+# include: 'modules/Snakefile_ancestry_plot'
+# #include: 'modules/Snakefile_ancestry_plot_by_group'
+# include: 'modules/Snakefile_contamination_plot'
+# include: 'modules/Snakefile_coverage_plot'
+# include: 'modules/Snakefile_duplication_plot'
+# include: 'modules/Snakefile_exomeCQA_plot'
+# include: 'modules/Snakefile_gender_plot'
+# include: 'modules/Snakefile_pre_calling_plot'        
         
 rule all:
     input:
         ancestry_check_dir + '/Results_on_HGDP938.png' if config['ancestry_check'] else [],
-        bamMatcher_dir + '/bam_matcher_report_all.txt' if ( config['somatic'] and config['matcher_check'] ) else [],
-        contamination_dir + 'bam_contamination_rate.png' if config['contamination_check'] else [],
-        coverage_dir + 'Average_Coverage_caco.png' if config['coverage_check'] else [],
-        deduplication_dir + 'subject_dup_rate.png' if config['duplication_check'] else [],
-        exomeCQA_dir +'cohort_coverage_sparseness.png' if config['exomeCQA_check'] else [],
-        exomeCQA_dir + 'unevenness.png' if config['exomeCQA_check'] else [],
+        bamMatcher_dir + '/bam_matcher_report_all.txt' if ( config['somatic'] and config['bam-matcher_check'] ) else [],
+        contamination_dir + '/bam_contamination_rate.png' if config['contamination_check'] else [],
+        coverage_dir + '/Average_Coverage_caco.png' if config['coverage_check'] else [],
+        deduplication_dir + '/subject_dup_rate.png' if config['duplication_check'] else [],
+        exomeCQA_dir + '/cohort_coverage_sparseness.png' if config['exomeCQA_check'] else [],
+        exomeCQA_dir + '/unevenness.png' if config['exomeCQA_check'] else [],
         gender_check_dir + '/gender_check.png' if config['gender_check'] else [],
-        precalling_dir + 'fold80.png' if config['pre_calling_check'] else [],
-        precalling_dir + 'seq_artifact.png' if config['pre_calling_check'] else [],
-        precalling_dir + 'oxidation.png' if config['pre_calling_check'] else [],
-        postcalling_qc_dir + '/basechange.png' if config['post_calling_check'] else [],
-        postcalling_qc_dir + '/variant_count.png' if ( config['post_calling_check'] and config['somatic'] ) else [],
-        postcalling_qc_dir + '/titv_ratio.png' if ( config['post_calling_check'] and config['somatic'] ) else []
+        precalling_dir + '/fold80.png' if config['pre_calling_check'] else [],
+        precalling_dir + '/seq_artifact.png' if config['pre_calling_check'] else [],
+        precalling_dir + '/oxidation.png' if config['pre_calling_check'] else [],
+        postcalling_qc_dir + '/basechange_all.png' if ( config['post_calling_check'] and not config['somatic'] ) else [],
+        postcalling_qc_dir + '/variant_count.png' if ( config['post_calling_check'] and not config['somatic'] ) else [],
+        postcalling_qc_dir + '/titv_ratio.png' if ( config['post_calling_check'] and not config['somatic'] ) else [],
+        postcalling_qc_dir + '/basechange_3d.png' if ( config['post_calling_check'] and config['somatic'] ) else [],        
+        postcalling_qc_dir + '/basechange_distribution.png' if ( config['post_calling_check'] and config['somatic'] ) else [],
+        'relatedness/relatedness.png' if ( config['relatedness_check'] and not config['somatic'] ) else [],
+        'fastqc/multiqc_report.html' if config['fastqc_check'] else []
  

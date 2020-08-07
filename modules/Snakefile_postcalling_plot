@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import glob
+#import glob
 import sys
 import os
 from glob import glob
@@ -19,11 +19,13 @@ rule run_basechange:
     output:
         postcalling_qc_dir + '/variants_annotated_basechange.txt'
     params:
-        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf'
+        vcf = postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf',
+        bed = bedFile
     shell:
-        '. /etc/profile.d/modules.sh; module load jdk;'
-        '''java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar filter "( ( FILTER =~ '2') | ( FILTER =~ '3') ) && ( ! (Intersection_region = '0') )" {input} > {params};'''
-        'perl ./modules/vcfFilter_count_base_change.pl {params} {output}'
+        '. /etc/profile.d/modules.sh; module load bcftools;'
+        #'''cat {input} | java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar filter "( ( FILTER =~ '2') | ( FILTER =~ '3') )" | java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar intervals {params.bed} > {params.vcf};'''
+        #'bcftools view --regions-file {params.bed} -f 2,3 -Ov -o {params.vcf} {input};'
+        'perl ./modules/vcfFilter_count_base_change.pl {params.vcf} {output}'
 
 rule postcalling_qc_table:
     input:

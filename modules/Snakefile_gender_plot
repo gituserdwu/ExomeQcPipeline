@@ -1,8 +1,8 @@
 #!/usr/bin/python
-import glob
+#import glob
 import sys
 import os
-from glob import iglob
+from glob import glob
 
 # rule all:
    # input:
@@ -73,12 +73,12 @@ rule gender_plot:
         colors <- c("Female"=rgb(0, 0, 1, .3), "Unknown"=rgb(1, 0, 0, .3), "Male"=rgb(0, 1, 0, .3),"Other"=rgb(.75, .75, .75, .3) )
         sortData <- arrange(data_gender, IDENTIFILER_GENDER, YXratio)
         plot(sortData$YXratio, xlab="Subjects", ylab="ChrY/ChrX Ratio", pch=20, col= colors[sortData$IDENTIFILER_GENDER], cex = 0.5)
-        legend("topleft", legend = c("Female", "Male", "Unknown"), col = c("blue", "red", "green"), pch = 19, cex=0.7, bty="n")
+        legend("topleft", legend = c("Male", "Female", "Unknown"), col = c("blue", "red", "green"), pch = 19, cex=0.7, bty="n")
         maledata <- subset(sortData, IDENTIFILER_GENDER=="Male", select=YXratio)
         femaledata <- subset(sortData, IDENTIFILER_GENDER=="Female", select=YXratio)
 
-        abline(h=colMeans(femaledata)+sd(femaledata$YXratio),col=colors["Male"])
-        abline(h=colMeans(maledata)-sd(maledata$YXratio),col=colors["Female"])
+        abline(h=colMeans(femaledata)+sd(femaledata$YXratio),col="red")
+        abline(h=colMeans(maledata)-sd(maledata$YXratio),col="blue")
         outlier <- subset(sortData, IDENTIFILER_GENDER==3&YXratio<=colMeans(femaledata)+sd(femaledata$YXratio)|IDENTIFILER_GENDER==1&YXratio>=colMeans(maledata)-sd(maledata$YXratio))
         sink("''' + str(output.outlier_table) + '''")
         print(outlier[,c(1,4,5)])

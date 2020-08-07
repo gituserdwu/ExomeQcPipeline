@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #https://stackoverflow.com/questions/5633828/convert-html-to-an-image-in-python in case we need to convert html to png image for mosdepth
-import glob
+#import glob
 import sys
 import os
 
@@ -20,24 +20,52 @@ rule mosdepth:
             for line in f:
                 if not ('chr' in line):
                     out.write(line)
-
-rule average_depth_caco:
-    input:
-        project + '/pre_calling_qc_report.txt'
-    output:
-        coverage_dir + '/Average_Coverage_caco.txt'
-    run:
-        with open(output[0], 'w') as out, open(input[0]) as f:
-            out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
-            next(f)
-            for line in f:
-                SAMPLE=line.split('\t')[0]
-                DEPTH=line.split('\t')[24].rstrip()
-                if not any (CONTROL in line for CONTROL in CONTROLS):
-                    out.write( SAMPLE + '\tCASE\t' + DEPTH + '\n' )
-                else:
-                    out.write( SAMPLE + '\tCONTROL\t' + DEPTH + '\n' )
                     
+if config['somatic']: 
+    rule average_depth_caco_somatic:
+        input:
+            report = project + '/pre_calling_qc_report.txt',
+            pairs = pair_manifest
+        output:
+            coverage_dir + '/Average_Coverage_caco.txt'
+        run:
+            TUMORS=[]
+            NORMALS=[]
+            with open(input.pairs) as manifest:
+                for line in manifest:
+                    normal=os.path.basename(line.split('\t')[1])[:-4]
+                    if normal not in NORMALS:
+                        NORMALS.append(normal) 
+                       #NORMALS.append(normal) if normal not in NORMALS
+            with open(output[0], 'w') as out, open(input.report) as f:
+                out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
+                next(f)
+                for line in f:
+                    SAMPLE=line.split('\t')[0]
+                    DEPTH=line.split('\t')[24].rstrip()
+                    if (SAMPLE in NORMALS):
+                        out.write( SAMPLE + '\tNORMAL\t' + DEPTH + '\n' )
+                    else:
+                        out.write( SAMPLE + '\tTUMOR\t' + DEPTH + '\n' )
+else:
+    rule average_depth_caco:
+        input:
+            project + '/pre_calling_qc_report.txt'
+        output:
+            coverage_dir + '/Average_Coverage_caco.txt'
+        run:
+            with open(output[0], 'w') as out, open(input[0]) as f:
+                out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
+                next(f)
+                for line in f:
+                    SAMPLE=line.split('\t')[0]
+                    DEPTH=line.split('\t')[24].rstrip()
+                    if not any (CONTROL in line for CONTROL in CONTROLS):
+                        out.write( SAMPLE + '\tCASE\t' + DEPTH + '\n' )
+                    else:
+                        out.write( SAMPLE + '\tCONTROL\t' + DEPTH + '\n' )
+
+           
 rule final_table:
     input:
         Manifest = manifest,
@@ -62,7 +90,7 @@ rule average_depth_plot:
         rTxt = '''
         library(ggplot2)
         data_coverage <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
-        colors <- c("CASE"="#f04546", "CONTROL"="#3591d1", "MergedBam"="#f04546", "LaneBamSum"="#3591d1")
+        colors <- c("CASE"="#f04546", "CONTROL"="#3591d1", "TUMOR"="#f04546", "NORMAL"="#3591d1", "MergedBam"="#f04546", "LaneBamSum"="#3591d1")
         sortData <- data_coverage[with(data_coverage, order(data_coverage$STATUS,data_coverage$COV)), ]
         downsample <- c("YES"=4, "NO"=19)
         png("''' + str(output.png_aveCov) + '''", 7, 7, "in", res = 300)
