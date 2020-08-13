@@ -1,4 +1,0 @@
-project: /DCEG/Projects/Exome/builds/build_SR0403-001_Mexican_breast_cancer_2019_22639/QC
-doc_template: /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/ExomeQcPipeline/ExomeQcPipeline_Template_interim.docx
-ref: /DCEG/CGF/Resources/Data/genome/hg19_canonical_correct_chr_order.fa
-capturekit: /DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_capture.bed
