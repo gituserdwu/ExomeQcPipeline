@@ -38,14 +38,14 @@ __Report branch:__
 __germline:__
   - 72 Giab controls sample testing build: /DCEG/Projects/Exome/builds/build_germline_pipeline_V3_testing/QC/
   
-  run `mv test/config_germline_example.yaml modules/config.yaml`
-  run `mv test/config_no_report_germline_example.yaml modules/config_no_report.yaml`
+  1. run `mv test/config_germline_example.yaml modules/config.yaml`
+  2. run `mv test/config_no_report_germline_example.yaml modules/config_no_report.yaml`
 
 __somatic:__
   - Breast cancer tumor normal buildL /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/
   
-  run `mv test/config_somatic_example.yaml modules/config.yaml`
-  run `mv test/config_no_report_somatic_example.yaml modules/config_no_report.yaml`
+  1. run `mv test/config_somatic_example.yaml modules/config.yaml`
+  2. run `mv test/config_no_report_somatic_example.yaml modules/config_no_report.yaml`
 
 ## Possible errors:
 
