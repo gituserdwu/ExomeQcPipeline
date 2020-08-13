@@ -1,0 +1,35 @@
+#general required files
+project: /DCEG/Projects/Exome/builds/build_germline_pipeline_V3_testing/YOUR_QC_DIR
+manifest: /DCEG/Projects/Exome/builds/build_germline_pipeline_V3_testing/Manifest/GIAB-CONTROLS-MANIFEST_07252017.csv
+precalling_report: /DCEG/Projects/Exome/builds/build_germline_pipeline_V3_testing/YOUR_QC_DIR/pre_calling_qc_report.txt
+capturekit: /DCEG/Projects/Exome/SequencingData/BED_FILES/seqcap_EZ_Exome_v3_v3utr_intersect_correct.bed
+exomeCQA_bed: /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/bedfiles/Intersect_v3_v3utr_capture_targets.bed
+ref: /DCEG/CGF/Resources/Data/genome/hg19_canonical_correct_chr_order.fa
+bam_location: /DCEG/Projects/Exome/builds/build_germline_pipeline_V3_testing/bam_location
+population_file: modules/HGDP/example.id #NA when no population file can be provided
+exomeCQA: /CGF/Bioinformatics/Production/software/ExomeCQA/ExomeCQA
+
+#germline required files
+ensemble_vcf: /DCEG/Projects/Exome/builds/build_germline_pipeline_V3_testing/Ensemble_New_Annotation/variants/variants_annotated.vcf.gz
+doc_template_germline: ExomeQcPipeline_Template_interim.docx
+
+#somatic required files
+somatic: FALSE
+pairs: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Manifest/pairs.txt
+ensemble_dir: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Results/Ensemble
+doc_template_somatic: ExomeQcPipeline_Template_interim.docx
+BamMatcher: /CGF/Bioinformatics/Production/software/bam-matcher.py
+
+#no report flags
+bam-matcher_check: FALSE
+
+ancestry_check: FALSE
+contamination_check: TRUE
+coverage_check: FALSE
+duplication_check: TRUE
+exomeCQA_check: TRUE
+fastqc_check: TRUE
+gender_check: TRUE
+pre_calling_check: FALSE
+post_calling_check: TRUE
+relatedness_check: TRUE
