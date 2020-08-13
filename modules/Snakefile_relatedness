@@ -4,31 +4,54 @@
 import sys
 import os
 
-rule run_relatedness2:
+rule run_filter:
     input:
         ensemble_vcf
     output:
-        relatedness_dir + '/out.relatedness2'
+        vcf = relatedness_dir + '/variants_annotated_majority_intersect.vcf'
+    params:    
+        bed = bedFile
+    shell:
+        '. /etc/profile.d/modules.sh; module load bcftools;'
+        #'''cat {input} | java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar filter "( ( FILTER =~ '2') | ( FILTER =~ '3') )" | java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar intervals {params.bed} > {params.vcf};'''
+        'bcftools view --regions-file {params.bed} -f 2,3 -Ov -o {output.vcf} {input};'
+        
+rule run_relatedness2:
+    input:
+        relatedness_dir + '/variants_annotated_majority_intersect.vcf'
+    output:
+        offDiagonalReport = relatedness_dir + '/out_off_diagonal.relatedness2',
+        pairwiseReport = relatedness_dir + '/out.relatedness2'
+    params:
+        totalSamp = len(SAMPLES)  
     shell:
         '. /etc/profile.d/modules.sh; module load zlib vcftools;'       
-        'cd relatedness; vcftools --gzvcf {input} --relatedness2'     
+        'cd relatedness; vcftools --vcf {input} --relatedness2;'
+        'total={params.totalSamp};'
+        'for i in `seq 1 ${{total}}`;do samp=`echo "${{i}}*${{total}}+1" | bc -l`;order=`echo "${{total}}-${{i}}" | bc -l`; head -n ${{samp}} {output.pairwiseReport} | tail -n ${{order}};done > {output.offDiagonalReport}'	   
 
 rule relatedness_plot:
     input:
-        relatedness_dir + '/out.relatedness2'
+        pairwiseReport = relatedness_dir + '/out.relatedness2',
+        offDiagonalReport = relatedness_dir + '/out_off_diagonal.relatedness2'
     output:
         png_relatedness = relatedness_dir + '/relatedness.png',
+        png_hist = relatedness_dir + '/relatedness_hist.png',
         R = relatedness_dir + '/relatedness.R',
         Rout = relatedness_dir + '/relatedness.R.out'
     run:
         rTxt = '''
         library(ggplot2)
-        data_relatedness <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        data_relatedness <- read.table("''' + str(input.pairwiseReport) + '''", header = TRUE, sep = "\t")
         png("''' + str(output.png_relatedness) + '''", 6.5, 6.5, "in", res = 300)
         ggplot(data_relatedness, aes(y=INDV2, x=INDV1) ) + geom_tile(aes(fill = log(RELATEDNESS_PHI,0.5)),colour = "green") +
         scale_fill_gradient(low = "green",high = "red") +
         scale_fill_continuous(limits = c(1,5), breaks = c(1, 2, 3, 4,5)) +
         theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        dev.off()
+        data_hist <- read.table("''' + str(input.offDiagonalReport) + '''", header = FALSE, sep = "\t")
+        png("''' + str(output.png_hist) + '''", 6.5, 6.5, "in", res = 300)
+        hist(data_hist[,7], breaks=100, main="Histogram for All Off-diagonal Pair Samples", xlab = "Off-diagonal elements of genetic relationship matrix",ylab="density", xlim=c(-0.3,0.3))
         dev.off()
         '''
         with open(output.R, 'w') as R:

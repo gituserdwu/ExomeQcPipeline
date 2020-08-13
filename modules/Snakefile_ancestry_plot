@@ -1,24 +1,11 @@
 #!/usr/bin/python
-import glob
-import sys
-import os
-from glob import glob
+#import glob
+import operator
+import itertools
+import shutil 
 
-# SAMPLES=[]
-# bamDict = {}
-
-# for bam in glob(bamDir + '/*.bam', recursive=True):
-    # sample = os.path.basename(bam)[:-4]
-    # SAMPLES.append(os.path.basename(bam)[:-4])
-    # bamDict[sample] = (bam)
-    
-# def get_bam(wildcards):
-    # (bam) = bamDict[wildcards.sample]
-    # return bam
-
-#rule all:
-#    input:
-#        ancestry_check_dir + '/Results_on_HGDP938.png'
+def sort_table(table, col=0):
+    return sorted(table, key=operator.itemgetter(col))
 
 rule mpileup:
     input:
@@ -27,12 +14,15 @@ rule mpileup:
         reference = refFile
     output:
         ancestry_check_dir + '/mpileup/{sample}_hgdp.mpileup'
+        #'laser/{sampleGroupDictName}/{sample}_hgdp.mpileup' #anything to represent {sampleGroupDictName} will be ok becuase the input of the next step can deduce output of this step
     shell:
         '. /etc/profile.d/modules.sh; module load samtools;'
-        'samtools mpileup -q 30 -Q 20 -f {input.reference} -l {input.bed} {input.bam} > {output}'
+        'samtools mpileup -q 30 -Q 20 -f {input.reference} -l {input.bed} {input.bam} > {output};'
 
 rule pileup2seq:
     input:
+        #lambda wildcards: [ancestry_check_dir + '/' + sampleGroupDict[sample] + '/' + sample + '_hgdp.mpileup' for sample in SAMPLES]
+        #lambda wildcards: expand(ancestry_check_dir + '/' + sampleGroupDict[sample] + '/{sample}_hgdp.mpileup',sample = SAMPLES) #should not use sampleGroupDict[wildcards.sample] because there is no wildcards from output 
         expand(ancestry_check_dir + '/mpileup/{sample}_hgdp.mpileup',sample = SAMPLES)
     output:
         ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq'
@@ -81,4 +71,51 @@ rule laser_plot:
         '. /etc/profile.d/modules.sh; module load R;'
         'cd modules/HGDP/; Rscript --vanilla plotHGDP_snakemake.r ../../{input.data} ../../{input.ref} ../../{output}'
 
+rule split_seq:
+    input:
+        seq = ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq'
+    output:
+        expand(ancestry_check_dir + '/pileup2seq_output_HGDP_938_{group}.seq', group = GROUPS)
+    run: 
+#https://stackoverflow.com/questions/41841070/i-want-split-a-text-file-into-multiple-files-by-a-column    
+        with open(input.seq, 'r') as fin:
+            for k, g in itertools.groupby(sort_table(fin), lambda l: l.split("_")[0]):
+                shutil.copyfile('laser/pileup2seq_output_HGDP_938.site', 'laser/pileup2seq_output_HGDP_938_{0}.site'.format(k))
+                with open('laser/pileup2seq_output_HGDP_938_{0}.seq'.format(k), 'w') as fout:
+                    for line in g:
+                        fout.write(line.strip() + '\n')
 
+rule laser_coord_group:
+    input:
+        ancestry_check_dir + '/pileup2seq_output_HGDP_938_{group}.seq'
+    output:
+        ancestry_check_dir + '/HGDP_938_{group}.RefPC.coord'
+    params:
+        conf = hgdpDir + '/example_coord.conf',
+        out_prefix = ancestry_check_dir + '/HGDP_938_{group}'
+    shell:
+        '. /etc/profile.d/modules.sh; module load laser;'
+        'laser -p {params.conf} -s {input} -o {params.out_prefix} -pca 1'
+
+rule laser_final_group:
+    input:
+        seq = ancestry_check_dir + '/pileup2seq_output_HGDP_938_{group}.seq',
+        coord = ancestry_check_dir + '/HGDP_938_{group}.RefPC.coord'
+    output:
+        ancestry_check_dir + '/HGDP_938_{group}.SeqPC.coord'
+    params:
+        conf = hgdpDir + '/example_final.conf',
+        out_prefix = ancestry_check_dir + '/HGDP_938_{group}'
+    shell:
+        '. /etc/profile.d/modules.sh; module load laser;'
+        'laser -p {params.conf} -s {input.seq} -c {input.coord} -o {params.out_prefix}'
+
+rule laser_plot_group:
+    input:
+        ref = ancestry_check_dir + '/HGDP_938_{group}.RefPC.coord',
+        data = ancestry_check_dir + '/HGDP_938_{group}.SeqPC.coord'
+    output:
+        ancestry_check_dir + '/Results_on_HGDP938_{group}.png'
+    shell:
+        '. /etc/profile.d/modules.sh; module load R;'
+        'cd modules/HGDP/; Rscript --vanilla plotHGDP_snakemake.r ../../{input.data} ../../{input.ref} ../../{output}'

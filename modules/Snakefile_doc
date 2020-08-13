@@ -76,6 +76,7 @@ rule word_doc:
         titv_ratio = 'postcalling_qc/titv_ratio.png' if not config['somatic'] else [],
         botton10_titv = 'postcalling_qc/titv_outlier10.txt' if not config['somatic'] else [],
         relatedness = 'relatedness/out.relatedness2' if not config['somatic'] else [],
+        relatedness_hist = relatedness_dir + '/relatedness_hist.png' if not config['somatic'] else [],
         basechange = postcalling_qc_dir + '/basechange_3d.png' if config['somatic'] else 'postcalling_qc/basechange_all.png',
         basechange_distribution = postcalling_qc_dir + '/basechange_distribution.png'  if config['somatic'] else [],
         bam_matcher_plot = bamMatcher_dir + '/bam_matcher_check.png' if config['somatic'] else []
@@ -87,8 +88,8 @@ rule word_doc:
         totSubs = len(SAMPLES)
         buildName = outName.replace("build_", "")
         bed = bedFile
-        #exomeCQAgeneReport = exomeCQAgeneReport
-        #exomeCQAexonReport = exomeCQAexonReport
+        exomeCQAgeneReport = exomeCQA_dir + '/exomeCQA_gene.chrALL'
+        exomeCQAexonReport = exomeCQA_dir + '/exomeCQA_exon.chrALL'
         geneNum = len(open(exomeCQAgeneReport).readlines(  ))
         exonNum = len(open(exomeCQAexonReport).readlines(  ))
         precallingQCReport = precallingReport
@@ -252,7 +253,7 @@ my_doc <- read_docx(path = "''' + input.template + '''") %>%
 
     cursor_reach(keyword = "Figure 8. ChrY/ChrX reads ratio for all subjects") %>%
     slip_in_img(src = "''' + input.sex_plot + '''", width = 5, height = 5, pos = "before") %>%
-    cursor_reach(keyword = "Figure 9. Laser ancestry estimation for all subjects: top 2 plots showing reference only, bottom 2 plots showing study subjects, black projected to reference samples, grey.") %>%
+    cursor_reach(keyword = "Figure 9. Laser ancestry estimation for all subjects") %>%
     slip_in_img(src = "''' + input.ancestry_plot + '''", width = 5, height = 5, pos = "before") %>%
     ''' 
         if config['somatic']:
@@ -274,8 +275,9 @@ my_doc <- read_docx(path = "''' + input.template + '''") %>%
     cursor_reach(keyword = "Figure 10b. Ensemble filtered variant ti/tv ratio by sample") %>%
     slip_in_img(src = "''' + input.titv_ratio + '''", width = 5, height = 5, pos = "before") %>%
     cursor_reach(keyword = "Figure 10c. base change counts per disease group") %>%
-    slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") %>%'''
-
+    slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 11. off-diagonal pairwise sample relatedness kinship coefficient") %>%
+    slip_in_img(src = "''' + input.relatedness_hist + '''", width = 5, height = 5, pos = "before") %>%'''
         rTxt += '''
 print(my_doc, target = "''' + output.doc + '''")
 '''

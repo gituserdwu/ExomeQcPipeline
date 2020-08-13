@@ -10,7 +10,7 @@ Also the pipeline has two branches: report generation branch and non report gene
 
 ## Input Requirement:
 
-__Non report branch:__
+__None report branch:__
 - Fill the config file modules/config_no_report.yaml
   - Bam-matcher_check: fill pair.txt if set TRUE
   - Coverage_check: fill pre-calling qc report if set TRUE
@@ -23,7 +23,7 @@ __Report branch:__
 
 ## How to run:
 
-__Non report branch:__
+__None report branch:__
 1. Create ExomeQcPipeline folder under build directory and download this repo to the ExomeQcPipeline folder
 2. Modify all parameters in `modules/config_no_report.yaml`
 3. run `sh run_snakefile_no_report.sh`
@@ -31,7 +31,17 @@ __Non report branch:__
 __Report branch:__
 1. Create ExomeQcPipeline folder under build directory and download this repo to the ExomeQcPipeline folder
 2. Modify all parameters in `modules/config.yaml`
-3. run `sh run_snakefile_test.sh`
+3. run `sh run_snakefile_report.sh`
+
+## Test dataset:
+
+__germline:__
+72 Giab controls sample testing build: /DCEG/Projects/Exome/builds/build_germline_pipeline_V3_testing/QC/
+Use config files in test/*_germline_example.yaml
+
+__somatic:__
+Breast cancer tumor normal buildL /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/
+Use config files in test/*_somatic_example.yaml
 
 ## Possible errors:
 

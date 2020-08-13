@@ -1,19 +1,34 @@
+##general required files
 project: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC
 manifest: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Manifest/SR0443-004-ANALYSIS-MANIFEST.csv
-exomCQA_gene: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/Breast_gene.chrALL
-exomCQA_exon: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/Breast_exon.chrALL
+bam_location: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/bam_location
 precalling_report: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/pre_calling_qc_report.txt
-doc_template_germline: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/ExomeQcPipeline/ExomeQcPipeline_Template_interim.docx
-doc_template_somatic: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/ExomeQcPipeline/ExomeQcPipeline_Template_interim.docx
 ref: /DCEG/CGF/Resources/Data/genome/hg19_canonical_correct_chr_order.fa
 capturekit: /DCEG/Projects/Exome/SequencingData/BED_FILES/customized_capturekit/161006_HG19_Kid-Lung-Extra_EZ_HX3_primary_targets.bed
 #/DCEG/Projects/Exome/SequencingData/BED_FILES/NV3UTR_NV3_nopadding_corrected.bed
+exomeCQA_bed: /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/bedfiles/Kid-Lung-Extra_capture_targets.bed
+exomeCQA: /CGF/Bioinformatics/Production/software/ExomeCQA/ExomeCQA
 population_file: modules/HGDP/example.id #NA when no population file can be provided
 
+##germline required files
 ensemble_vcf: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Results/annotation/merged_ensemble_voting_passed_annotated.vcf
-ensemble_dir: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Results/Ensemble
-bam_location: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/bam_location
+doc_template_germline: ExomeQcPipeline_Template_interim.docx
 
+##somatic required files
 somatic: TRUE
-BamMatcher: ~/tools/bam-matcher/bam-matcher.py
+BamMatcher: /CGF/Bioinformatics/Production/software/bam-matcher.py
 pairs: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Manifest/pairs.txt
+doc_template_somatic: ExomeQcPipeline_Somatic_Template_interim.docx
+ensemble_dir: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Results/Ensemble
+
+##flags
+ancestry_check: TRUE
+contamination_check: TRUE
+coverage_check: FALSE
+duplication_check: TRUE
+exomeCQA_check: FALSE
+fastqc_check: FALSE
+gender_check: TRUE
+pre_calling_check: FALSE
+post_calling_check: TURE
+relatedness_check: TRUE
