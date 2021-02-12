@@ -64,3 +64,23 @@ rule summary_bam_matcher:
                     RATE=lines[24].split(':')[1].split('(')[0].rstrip()
                     CONCLUSION=lines[27].rstrip()
                     outfile.write( SAMP + '\t' + SITE + '\t' + RATE+ '\t' + CONCLUSION + '\n' )
+                    
+rule bammatcher_plot:
+    input:
+        bamMatcher_dir + '/bam_matcher_report_all.txt'
+    output:
+        png_bammatcher = bamMatcher_dir + '/bam_matcher_check.png',
+        R = bamMatcher_dir + '/bam_matcher_check.R',
+        Rout = bamMatcher_dir + '/bam_matcher_check.R.out'
+    run:
+        rTxt = '''
+        data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_bammatcher) + '''", 6.5, 6.5, "in", res = 300)
+        plot(data$RATE,data$SITE, xlab="Fraction of site with common genotype", ylab="Checking site number", pch=19, xlim=c(0.3,1)) 
+        dev.off()
+
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')                    
+                    

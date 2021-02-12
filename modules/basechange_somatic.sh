@@ -37,7 +37,7 @@ for f in $VCF_LIST; do
 ########################
 # Write VAF RD txt file
 cat $f | \
-awk '
+awk -v name=${OUTPUT} ' 
 
 BEGIN{
 	FS="\t"
@@ -70,7 +70,7 @@ if ( $1 !~ "#" && $7 ~ ";PASS" ) {
 		}
 	}
 	if ( length(REF) ==1 && length(ALT) ==1 ) {
-		printf("%s\t%s\t%s>%s\t%d\t%f\n", $1,$2,REF,ALT,RD,VAF)
+		printf("%s\t%s\t%s\t%s>%s\t%d\t%f\n", name,$1,$2,REF,ALT,RD,VAF)
 	}
 }
 }' >> $VAF_TXT

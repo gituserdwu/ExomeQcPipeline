@@ -6,11 +6,12 @@ MANIFEST=$1
 CASE_FILE=$2
 OUTDIR=$3
 
+dos2unix $MANIFEST
 NF=$(awk -F"," 'NR==1{print NF}' $MANIFEST)
 
-if [[ $NF == 15 ]]; then
+if [[ $NF -gt 14 ]]; then
   #a[$2]+=$1 - accumulating values for each group("group" is considered as unique value of the 2nd field, used as array a index)
-  awk -F "," 'NR>1{ a[$7"_"$13]+=$11*$15 }END{ for(i in a) print i"\t"a[i] | "sort -n"}' $MANIFEST > ${OUTDIR}/coverage_added_downsample.txt
+  awk -F "," 'NR>1{if($15 == ""){$15=1}; a[$7"_"$13]+=$11*$15 }END{ for(i in a) print i"\t"a[i] | "sort -n"}' $MANIFEST > ${OUTDIR}/coverage_added_downsample.txt
   awk -F "," 'NR>1{ a[$7"_"$13]+=$11 }END{ for(i in a) print i"\t"a[i] | "sort -n"}' $MANIFEST > ${OUTDIR}/coverage_added.txt
   #compare if the final coverage is same before and after multiply downsample ratio
   awk -F"\t" 'BEGIN {print "ANALYSISID\tADDED_COV\tDOWNSAMPLE"} NR==FNR { if (n[$2] = $2);next} {print $0"\t",n[$2]?"NO":"YES"}' ${OUTDIR}/coverage_added.txt ${OUTDIR}/coverage_added_downsample.txt > ${OUTDIR}/Sum_Coverage.txt

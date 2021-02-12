@@ -22,8 +22,8 @@ rule XYratio_single:
         project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt' 
     shell:
         '. /etc/profile.d/modules.sh; module load samtools;'
-        '''Xcount=$(samtools view {input} | awk '$3~/chrX/ {{print}}' | wc -l);'''
-        '''Ycount=$(samtools view {input} | awk '$3~/chrY/ {{print}}' | wc -l);'''
+        'Xcount=$(samtools view -c {input} chrX );'
+        'Ycount=$(samtools view -c {input} chrY );'
         'echo -e "{wildcards.sample}\t${{Xcount}}\t${{Ycount}}" > {output}'
    
 rule XYratio_table:
@@ -55,7 +55,7 @@ rule XYratio_table:
                 ratio = float(line.split('\t')[2])/float(line.split('\t')[1])
                 value = genderDic.get(line.split('\t')[0].strip())
                 if value is not None:
-                    outfile.write(line.strip() + '\t' + value.replace("F","Female").replace("M","Male").replace("U","Unknown") + '\t' + str(ratio) + '\n')
+                    outfile.write(line.strip() + '\t' + value.replace("F","Female").replace("M","Male").replace("N","Unknown") + '\t' + str(ratio) + '\n')
 
 rule gender_plot:
     input:
@@ -67,18 +67,23 @@ rule gender_plot:
         Rout = gender_check_dir + '/gender_check.R.out'
     run:
         rTxt = '''
+        library(ggplot2)
         library(dplyr)
         data_gender <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
         png("''' + str(output.png_gender) + '''", 6.5, 6.5, "in", res = 300)
-        colors <- c("Female"=rgb(0, 0, 1, .3), "Unknown"=rgb(1, 0, 0, .3), "Male"=rgb(0, 1, 0, .3),"Other"=rgb(.75, .75, .75, .3) )
+        colors <- c("Male"=rgb(0, 0, 1, .3), "Unknown"=rgb(1, 0, 0, .3), "Female"=rgb(0, 1, 0, .3),"Other"=rgb(.75, .75, .75, .3) )
         sortData <- arrange(data_gender, IDENTIFILER_GENDER, YXratio)
-        plot(sortData$YXratio, xlab="Subjects", ylab="ChrY/ChrX Ratio", pch=20, col= colors[sortData$IDENTIFILER_GENDER], cex = 0.5)
-        legend("topleft", legend = c("Male", "Female", "Unknown"), col = c("blue", "red", "green"), pch = 19, cex=0.7, bty="n")
         maledata <- subset(sortData, IDENTIFILER_GENDER=="Male", select=YXratio)
         femaledata <- subset(sortData, IDENTIFILER_GENDER=="Female", select=YXratio)
 
-        abline(h=colMeans(femaledata)+sd(femaledata$YXratio),col="red")
-        abline(h=colMeans(maledata)-sd(maledata$YXratio),col="blue")
+        gg <- ggplot(sortData, aes(x=factor(SAMPLE, levels=unique(SAMPLE)), y=YXratio)) 
+        gg + geom_point(aes(color=as.factor(IDENTIFILER_GENDER))) + 
+        scale_color_manual(name="Sex",values=colors) + 
+        labs(x = "subjects", y = "ChrY/ChrX Reads Ratio") +
+        theme(legend.position=c(0.1, 0.9),axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+        theme(axis.line = element_line(size = 1, colour = "grey"),panel.background = element_rect(fill = "white")) +
+        geom_hline(yintercept = colMeans(femaledata)+sd(femaledata$YXratio), color=rgb(0, 1, 0, .3)) +
+        geom_hline(yintercept = colMeans(maledata)-sd(maledata$YXratio),color=rgb(0, 0, 1, .3))
         outlier <- subset(sortData, IDENTIFILER_GENDER==3&YXratio<=colMeans(femaledata)+sd(femaledata$YXratio)|IDENTIFILER_GENDER==1&YXratio>=colMeans(maledata)-sd(maledata$YXratio))
         sink("''' + str(output.outlier_table) + '''")
         print(outlier[,c(1,4,5)])

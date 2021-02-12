@@ -24,7 +24,7 @@ rule mosdepth:
 if config['somatic']: 
     rule average_depth_caco_somatic:
         input:
-            report = project + '/pre_calling_qc_report.txt',
+            report = precallingReport,
             pairs = pair_manifest
         output:
             coverage_dir + '/Average_Coverage_caco.txt'
@@ -50,7 +50,7 @@ if config['somatic']:
 else:
     rule average_depth_caco:
         input:
-            project + '/pre_calling_qc_report.txt'
+            precallingReport
         output:
             coverage_dir + '/Average_Coverage_caco.txt'
         run:
@@ -100,7 +100,7 @@ rule average_depth_plot:
         scale_color_manual(name="Status",values=colors) + 
         coord_cartesian(clip = 'off') +
         labs(x = "samples", y = "Average Cov") +
-        theme(legend.position="right",axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+        theme(legend.position="right")+
         theme(axis.line = element_line(size = 1, colour = "grey"),panel.background = element_rect(fill = "white"))
         dev.off()
         png("''' + str(output.png_addedCov) + '''", 6.5, 6.5, "in", res = 300)
