@@ -75,7 +75,7 @@ rule word_doc:
         botton10_count = 'postcalling_qc/variant_outlier10.txt' if not config['somatic'] else [],
         titv_ratio = 'postcalling_qc/titv_ratio.png' if not config['somatic'] else [],
         botton10_titv = 'postcalling_qc/titv_outlier10.txt' if not config['somatic'] else [],
-        relatedness = 'relatedness/out.relatedness2' if not config['somatic'] else [],
+        relatedness = 'out.relatedness2' if not config['somatic'] else [],
         relatedness_hist = relatedness_dir + '/relatedness_hist.png' if not config['somatic'] else [],
         basechange = postcalling_qc_dir + '/basechange_3d.png' if config['somatic'] else 'postcalling_qc/basechange_all.png',
         basechange_distribution = postcalling_qc_dir + '/basechange_distribution.png'  if config['somatic'] else [],

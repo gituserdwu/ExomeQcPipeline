@@ -6,7 +6,7 @@ import os
 from glob import glob
 from glob import iglob
 
-configfile: "config.yaml"
+configfile: "modules/config.yaml"
 outName = os.path.basename(os.path.dirname(config['project']))
 ensemble_vcf = config['ensemble_vcf']
 bam_location = config['bam_location']
@@ -18,8 +18,8 @@ refFile = config['ref']
 populationFile = config['population_file']
 bedFile = config['capturekit']
 precallingReport = config['precalling_report']
-exomeCQAgeneReport = config['exomCQA_gene']
-exomeCQAexonReport = config['exomCQA_exon']
+#exomeCQAgeneReport = config['exomCQA_gene']
+#exomeCQAexonReport = config['exomCQA_exon']
 
 gender_check_dir = 'gender_check'
 postcalling_qc_dir = 'postcalling_qc'
@@ -30,12 +30,14 @@ exomeCQA_dir = 'exomeCQA'
 hgdpDir = 'modules/HGDP'
 deduplication_dir = 'deduplication'
 precalling_dir = 'precalling_qc'
+relatedness_dir = 'relatedness'
+fastqc_dir = 'fastqc'
 
 GROUPS=[]
 SAMPLES = []
 sampleGroupDict = {}
 CONTROLS = ['PLCO', 'ACS', 'LC_IGC', 'EAGLE_IGC', 'CTRL', '_Normal']
-
+#CONTROLS = ['ACS', 'LC_IGC', 'EAGLE_IGC', 'CTRL', '_Normal']
 ########################
 #Germline call
 
@@ -66,36 +68,36 @@ def getReport(wildcards):
 ########################
 #Somatic pair call
 
-pair_manifest = config['pairs']
-bamMatcher_dir = 'bamMatcher'
-bamMatcherExe = config['BamMatcher']
-
-PAIRS = []
-tumorDict = {}
-normalDict = {}
-
-with open(pair_manifest) as f:
-    for line in f:
-        (tumor, normal, vcf) = line.split()
-        sample = os.path.basename(vcf)[:-4]
-        PAIRS.append(os.path.basename(vcf)[:-4])
-        tumorName = os.path.basename(tumor)[:-4]
-        normalName = os.path.basename(normal)[:-4]
-        tumorDict[sample] = (tumor)
-        normalDict[sample] = (normal)
-
-def get_tumor(wildcards):
-    (file) = tumorDict[wildcards.sample]
-    return file
-
-def get_normal(wildcards):
-    (file) = normalDict[wildcards.sample]
-    return file     
+  
 
 if config['somatic']: 
+
     pair_manifest = config['pairs']
     bamMatcher_dir = 'bamMatcher'
     bamMatcherExe = config['BamMatcher']
+
+    PAIRS = []
+    tumorDict = {}
+    normalDict = {}
+
+    with open(pair_manifest) as f:
+        for line in f:
+            (tumor, normal, vcf) = line.split()
+            sample = os.path.basename(vcf)[:-4]
+            PAIRS.append(os.path.basename(vcf)[:-4])
+            tumorName = os.path.basename(tumor)[:-4]
+            normalName = os.path.basename(normal)[:-4]
+            tumorDict[sample] = (tumor)
+            normalDict[sample] = (normal)
+
+    def get_tumor(wildcards):
+        (file) = tumorDict[wildcards.sample]
+        return file
+
+    def get_normal(wildcards):
+        (file) = normalDict[wildcards.sample]
+        return file   
+    
     include: 'modules/Snakefile_bam_matcher'
     
 include: 'modules/Snakefile_ancestry_plot'

@@ -6,7 +6,7 @@ MANIFEST=$1
 CASE_FILE=$2
 OUTDIR=$3
 
-dos2unix $MANIFEST
+#dos2unix $MANIFEST
 NF=$(awk -F"," 'NR==1{print NF}' $MANIFEST)
 
 if [[ $NF -gt 14 ]]; then

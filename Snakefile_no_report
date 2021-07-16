@@ -18,8 +18,8 @@ refFile = config['ref']
 populationFile = config['population_file']
 bedFile = config['capturekit']
 precallingReport = config['precalling_report']
-exomeCQAgeneReport = config['exomCQA_gene']
-exomeCQAexonReport = config['exomCQA_exon']
+#exomeCQAgeneReport = config['exomCQA_gene']
+#exomeCQAexonReport = config['exomCQA_exon']
 
 gender_check_dir = 'gender_check'
 postcalling_qc_dir = 'postcalling_qc'
@@ -149,7 +149,7 @@ else:
 rule all:
     input:
         ancestry_check_dir + '/Results_on_HGDP938.png' if config['ancestry_check'] else [],
-        bamMatcher_dir + '/bam_matcher_report_all.txt' if ( config['somatic'] and config['bam-matcher_check'] ) else [],
+        bamMatcher_dir + '/bam_matcher_check.png' if ( config['somatic'] and config['bam-matcher_check'] ) else [],
         contamination_dir + '/bam_contamination_rate.png' if config['contamination_check'] else [],
         coverage_dir + '/Average_Coverage_caco.png' if config['coverage_check'] else [],
         deduplication_dir + '/subject_dup_rate.png' if config['duplication_check'] else [],

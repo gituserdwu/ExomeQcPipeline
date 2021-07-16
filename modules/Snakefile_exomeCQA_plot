@@ -8,7 +8,7 @@ rule exomeCQA_bedCov:
     output:
         exomeCQA_dir + '/bedcov/{sample}_coverage.txt'
     threads:
-       2 
+       10 
     shell:
         '. /etc/profile.d/modules.sh; module load bedtools/2.26.0;'
         'coverageBed -a {input.bed} -b {input.bam} -d > {output}'
@@ -21,7 +21,7 @@ rule exomeCQA_genInd:
     threads:
         2
     shell:
-        '/CGF/Bioinformatics/Production/software/ExomeCQA/ExomeCQA/genIndex {input} > {output}'
+        '/CGF/Bioinformatics/Production/software/ExomeCQA/genIndex {input} > {output}'
 		
 rule exomeCQA:
     input:
@@ -34,7 +34,7 @@ rule exomeCQA:
     threads:
         20
     shell:
-        '/CGF/Bioinformatics/Production/software/ExomeCQA/ExomeCQA/ExomeCQA {params} {output.exon} {output.gene}'
+        '/CGF/Bioinformatics/Production/software/ExomeCQA/ExomeCQA {params} {output.exon} {output.gene}'
 		
 rule exomeCQA_exon_score:
     input:
