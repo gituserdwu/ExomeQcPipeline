@@ -10,10 +10,12 @@ rule run_verifyBamID:
     output:
         project + '/subject_level_BAM_contamination/results/tmp_working/{sample}.selfSM'
     params:
-        project + '/subject_level_BAM_contamination/results/tmp_working/{sample}'
+        outDir = project + '/subject_level_BAM_contamination/results/tmp_working/{sample}',
+        omnivcf = config['omniVcf']
     shell:
-        '/DCEG/CGF/Bioinformatics/Production/BZhu/bin/verifyBamID_1.1.0/verifyBamID/bin/verifyBamID --ignoreRG --chip-none --precise --vcf /DCEG/CGF/Bioinformatics/Production/BZhu/verifyBamID/Omni25_genotypes_1525_samples_v2.b37.PASS.ALL.sites_with_chr.vcf --bam {input} --out {params}'     
-
+        #'/DCEG/CGF/Bioinformatics/Production/BZhu/bin/verifyBamID_1.1.0/verifyBamID/bin/verifyBamID --ignoreRG --chip-none --precise --vcf /DCEG/CGF/Bioinformatics/Production/BZhu/verifyBamID/Omni25_genotypes_1525_samples_v2.b37.PASS.ALL.sites_with_chr.vcf --bam {input} --out {params}'     
+        '/DCEG/CGF/Bioinformatics/Production/BZhu/bin/verifyBamID_1.1.0/verifyBamID/bin/verifyBamID --ignoreRG --chip-none --precise --vcf {params.omnivcf} --bam {input} --out {params.outDir}'     
+        
 rule sum_verifyBamID:
     input:
         expand(project + '/subject_level_BAM_contamination/results/tmp_working/{sample}.selfSM', sample = SAMPLES)

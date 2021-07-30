@@ -12,12 +12,12 @@ project = config['project']
 
 rule pre_calling_plot:
     input:
-        project + '/pre_calling_qc_report.txt'
+        config['precalling_report']
     output:
         png_aritifact = precalling_dir + '/seq_artifact.png',
-        png_foldeighty = precalling_dir + '/fold80.png',
+        png_foldeighty = precalling_dir + '/fold80.png' if not config['MODE'] == 'wgs' else [],
         png_oxidation = precalling_dir + '/oxidation.png',
-        png_insertSize = precalling_dir + '/insertSize.png',
+        png_insertSize = precalling_dir + '/insertSize.png',        
         R = precalling_dir + '/precalling_qc_plot.R',
         Rout = precalling_dir + '/precalling_qc_plot.R.out'
     run:
@@ -32,7 +32,10 @@ rule pre_calling_plot:
         dev.off()
         png("''' + str(output.png_insertSize) + '''")
         boxplot(data_precalling$MEDIAN_INSERT_SIZES,data_precalling$MEAN_INSERT_SIZES, names = c("Median Insert Size", "Mean Insert Size"),ylab = "Base Pair", main = "CollectInsertSizeMetrics",  outline=FALSE, ylab="Qual Score")
-        dev.off()        
+        dev.off()                
+        '''
+        if not config['MODE'] == 'wgs':
+            rTxt += '''
         data_precalling2<-data_precalling[!(data_precalling$FOLD_80_BASE_PENALTY=="?"),]
         png("''' + str(output.png_foldeighty) + '''")
         ggplot(data_precalling2, aes(as.numeric(as.character(FOLD_80_BASE_PENALTY)))) + 

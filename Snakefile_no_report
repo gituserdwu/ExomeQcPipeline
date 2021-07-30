@@ -38,6 +38,9 @@ SAMPLES = []
 sampleGroupDict = {}
 CONTROLS = ['PLCO', 'ACS', 'LC_IGC', 'EAGLE_IGC', 'CTRL', '_Normal']
 
+
+include: "modules/Snakemake_utils"
+
 ########################
 #Germline call
 
@@ -68,7 +71,7 @@ def getReport(wildcards):
 ########################
 #Somatic pair call
 
-if config['somatic']: 
+if config['MODE'] == 'somatic': 
     pair_manifest = config['pairs']
     bamMatcher_dir = 'bamMatcher'
     bamMatcherExe = config['BamMatcher']
@@ -124,7 +127,7 @@ else:
         include: 'modules/Snakefile_coverage_plot'
     if config['duplication_check']:           
         include: 'modules/Snakefile_duplication_plot'
-    if config['exomeCQA_check']:           
+    if (config['MODE'] == 'wes' and config['exomeCQA_check']):           
         include: 'modules/Snakefile_exomeCQA_plot'
     if config['fastqc_check']:           
         include: 'modules/Snakefile_fastqc'           
@@ -148,22 +151,23 @@ else:
         
 rule all:
     input:
-        ancestry_check_dir + '/Results_on_HGDP938.png' if config['ancestry_check'] else [],
-        bamMatcher_dir + '/bam_matcher_check.png' if ( config['somatic'] and config['bam-matcher_check'] ) else [],
+        ancestry_check_dir + '/procrustesPCASamples.png' if config['ancestry_check'] else [],
+        bamMatcher_dir + '/bam_matcher_check.png' if ( config['MODE'] == 'somatic' and config['bam-matcher_check'] ) else [],
         contamination_dir + '/bam_contamination_rate.png' if config['contamination_check'] else [],
         coverage_dir + '/Average_Coverage_caco.png' if config['coverage_check'] else [],
         deduplication_dir + '/subject_dup_rate.png' if config['duplication_check'] else [],
-        exomeCQA_dir + '/cohort_coverage_sparseness.png' if config['exomeCQA_check'] else [],
-        exomeCQA_dir + '/unevenness.png' if config['exomeCQA_check'] else [],
+        exomeCQA_dir + '/cohort_coverage_sparseness.png' if ( not config['MODE'] == 'wgs' and config['exomeCQA_check']) else [],
+        exomeCQA_dir + '/unevenness.png' if ( not config['MODE'] == 'wgs' and config['exomeCQA_check']) else [],
         gender_check_dir + '/gender_check.png' if config['gender_check'] else [],
-        precalling_dir + '/fold80.png' if config['pre_calling_check'] else [],
+        precalling_dir + '/fold80.png' if (config['pre_calling_check'] and not config['MODE'] == 'wgs') else [],
+        precalling_dir + '/insertSize.png',        
         precalling_dir + '/seq_artifact.png' if config['pre_calling_check'] else [],
         precalling_dir + '/oxidation.png' if config['pre_calling_check'] else [],
-        postcalling_qc_dir + '/basechange_all.png' if ( config['post_calling_check'] and not config['somatic'] ) else [],
-        postcalling_qc_dir + '/variant_count.png' if ( config['post_calling_check'] and not config['somatic'] ) else [],
-        postcalling_qc_dir + '/titv_ratio.png' if ( config['post_calling_check'] and not config['somatic'] ) else [],
-        postcalling_qc_dir + '/basechange_3d.png' if ( config['post_calling_check'] and config['somatic'] ) else [],        
-        postcalling_qc_dir + '/basechange_distribution.png' if ( config['post_calling_check'] and config['somatic'] ) else [],
-        'relatedness/relatedness.png' if ( config['relatedness_check'] and not config['somatic'] ) else [],
+        postcalling_qc_dir + '/basechange_all.png' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
+        postcalling_qc_dir + '/variant_count.png' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
+        postcalling_qc_dir + '/titv_ratio.png' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
+        postcalling_qc_dir + '/basechange_3d.png' if ( config['post_calling_check'] and config['MODE'] == 'somatic' ) else [],        
+        postcalling_qc_dir + '/basechange_distribution.png' if ( config['post_calling_check'] and config['MODE'] == 'somatic' ) else [],
+        'relatedness/relatedness.png' if ( config['relatedness_check'] and not config['MODE'] == 'somatic' ) else [],
         'fastqc/multiqc_report.html' if config['fastqc_check'] else []
  

@@ -11,7 +11,7 @@ rule myfastqc:
         'fastqc/{sample}_fastqc.html'
     params:
         outdir = 'fastqc',
-        tmpdir = '/scratch/luow2/fastqc'
+        tmpdir = config['tmpDir']
     shell:
         '. /etc/profile.d/modules.sh; module load fastqc;'
         'fastqc -o {params.outdir} -f bam {input} -d {params.tmpdir}'

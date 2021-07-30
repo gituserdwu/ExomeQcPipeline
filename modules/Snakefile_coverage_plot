@@ -21,7 +21,7 @@ rule mosdepth:
                 if not ('chr' in line):
                     out.write(line)
                     
-if config['somatic']: 
+if config['MODE'] == 'somatic': 
     rule average_depth_caco_somatic:
         input:
             report = precallingReport,
@@ -47,6 +47,20 @@ if config['somatic']:
                         out.write( SAMPLE + '\tNORMAL\t' + DEPTH + '\n' )
                     else:
                         out.write( SAMPLE + '\tTUMOR\t' + DEPTH + '\n' )
+elif config['MODE'] == 'wgs':  
+    rule average_depth_caco:
+        input:
+            precallingReport
+        output:
+            coverage_dir + '/Average_Coverage_caco.txt'
+        run:
+            with open(output[0], 'w') as out, open(input[0]) as f:
+                out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
+                next(f)
+                for line in f:
+                    SAMPLE=line.split('\t')[0]
+                    DEPTH=line.split('\t')[20].rstrip()   
+                    out.write( SAMPLE + '\tCASE\t' + DEPTH + '\n' )                    
 else:
     rule average_depth_caco:
         input:

@@ -7,115 +7,79 @@ import shutil
 def sort_table(table, col=0):
     return sorted(table, key=operator.itemgetter(col))
 
-rule mpileup:
+rule angsd:
     input:
         bam = getBam,
-        bed = hgdpDir + '/HGDP_938_hg19.bed',
-        reference = refFile
     output:
-        ancestry_check_dir + '/mpileup/{sample}_hgdp.mpileup'
-        #'laser/{sampleGroupDictName}/{sample}_hgdp.mpileup' #anything to represent {sampleGroupDictName} will be ok becuase the input of the next step can deduce output of this step
-    shell:
-        '. /etc/profile.d/modules.sh; module load samtools;'
-        'samtools mpileup -q 30 -Q 20 -f {input.reference} -l {input.bed} {input.bam} > {output};'
-
-rule pileup2seq:
-    input:
-        #lambda wildcards: [ancestry_check_dir + '/' + sampleGroupDict[sample] + '/' + sample + '_hgdp.mpileup' for sample in SAMPLES]
-        #lambda wildcards: expand(ancestry_check_dir + '/' + sampleGroupDict[sample] + '/{sample}_hgdp.mpileup',sample = SAMPLES) #should not use sampleGroupDict[wildcards.sample] because there is no wildcards from output 
-        expand(ancestry_check_dir + '/mpileup/{sample}_hgdp.mpileup',sample = SAMPLES)
-    output:
-        ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq'
+        beagle = ancestry_check_dir + '/{sample}.beagle.gz'
+        #txt = outDir + 'fastNGSadmix/{sample}.qopt'
     params:
-        captureKit = config['capturekit'],
-        out_prefix = ancestry_check_dir + '/pileup2seq_output_HGDP_938',
-        reference = refFile,
-        site = hgdpDir + '/HGDP_938.site',
-        id = '-i ' + populationFile if config['population_file'] != 'NA' else []
-    threads:
-        8
+        refSite = config['fastNGSsite'],
+        temp = temp(ancestry_check_dir + '/{sample}_temp.beagle.gz'),
+        temp2 = temp(ancestry_check_dir + '/{sample}.beagle'),
+        prefix = ancestry_check_dir + '/{sample}_temp',
+        prefix2 = ancestry_check_dir + '/{sample}'
     shell:
-        '. /etc/profile.d/modules.sh; module load python/2.7.8;'
-        'python /DCEG/Resources/Tools/laser/LASER-2.04/pileup2seq/pileup2seq -f {params.reference} -m {params.site} {params.id} -b {params.captureKit} -o {params.out_prefix} {input}'
+        '. /etc/profile.d/modules.sh; module load angsd/0.935 tabix ;'
+        'angsd -i {input} -GL 2 -sites {params.refSite} -doGlf 2 -doMajorMinor 3 -minMapQ 30 -minQ 20 -doDepth 1 -doCounts 1 -out {params.prefix};'
+        '''zcat {params.temp}| sed 's/^chr//g' > {params.temp2} && bgzip {params.temp2} ;'''
 
-rule laser_coord:
+rule fastNGSadmix:
     input:
-        ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq'
+        beagle = ancestry_check_dir + '/{sample}.beagle.gz'
     output:
-        ancestry_check_dir + '/HGDP_938.RefPC.coord'
+        ancestry_check_dir + '/{sample}.qopt'
     params:
-        hgdpDir + '/example_coord.conf'
+        refPanel = config['fastNGSpanel'],
+        refInd = config['fastNGSiInd'],
+        prefix = ancestry_check_dir + '/{sample}'
+    benchmark:
+        ancestry_check_dir + '/benchmark/fastNGSadmix_{sample}.txt'
     shell:
-        '. /etc/profile.d/modules.sh; module load laser;'
-        'laser -p {params} -s {input} -pca 1'
+        '. /etc/profile.d/modules.sh; module load R gcc/7.2.0;'   
+        '/CGF/Bioinformatics/Production/software/fastNGSadmix/fastNGSadmix -likes {input.beagle} -fname {params.refPanel} -Nname {params.refInd} -out {params.prefix} -whichPops CEU,CHB,YRI,PEL'
 
-rule laser_final:
+rule fastNGSadmixPCA:
     input:
-        seq = ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq',
-        coord = ancestry_check_dir + '/HGDP_938.RefPC.coord'
+        qopt = ancestry_check_dir + '/{sample}.qopt',
+        beagle = ancestry_check_dir + '/{sample}.beagle.gz'
     output:
-        ancestry_check_dir + '/HGDP_938.SeqPC.coord'
+        barPlot = ancestry_check_dir + '/{sample}_admixBarplot.png',
+        covar = ancestry_check_dir + '/{sample}_covar.txt',
+        eigenValue = ancestry_check_dir + '/{sample}_eigenvals.txt',
+        eigenVector = ancestry_check_dir + '/{sample}_eigenvecs.txt',
+        pcaPlot = ancestry_check_dir + '/{sample}_PCAplot.pdf'
+        
     params:
-        hgdpDir + '/example_final.conf'
+        ref = config['refPlink'],
+        prefix = ancestry_check_dir + '/{sample}'
     shell:
-        '. /etc/profile.d/modules.sh; module load laser;'
-        'laser -p {params} -s {input.seq} -c {input.coord}'
+        '. /etc/profile.d/modules.sh; module load R;'    
+        'Rscript /CGF/Bioinformatics/Production/software/fastNGSadmix/R/fastNGSadmixPCA.R -likes {input.beagle} -qopt {input.qopt} -out {params.prefix} -ref {params.ref};'
 
-rule laser_plot:
+rule listProcastes:
     input:
-        ref = ancestry_check_dir + '/HGDP_938.RefPC.coord',
-        data = ancestry_check_dir + '/HGDP_938.SeqPC.coord'
+        qopt = expand(ancestry_check_dir + '/{sample}.qopt', sample = SAMPLES)
     output:
-        ancestry_check_dir + '/Results_on_HGDP938.png'
-    shell:
-        '. /etc/profile.d/modules.sh; module load R;'
-        'cd modules/HGDP/; Rscript --vanilla plotHGDP_snakemake.r ../../{input.data} ../../{input.ref} ../../{output}'
-
-rule split_seq:
+        ancestry_check_dir + '/procrustes.list'
+    run:
+        with open(output[0], 'w') as out:
+            for i in input.qopt:
+                s = os.path.basename(i)[:-5] 
+                out.write( s + '\n' )                
+        
+rule doProcastesPCA:
     input:
-        seq = ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq'
+        covar = expand(ancestry_check_dir + '/{sample}_covar.txt', sample = SAMPLES),   
+        list = ancestry_check_dir + '/procrustes.list'        
     output:
-        expand(ancestry_check_dir + '/pileup2seq_output_HGDP_938_{group}.seq', group = GROUPS)
-    run: 
-#https://stackoverflow.com/questions/41841070/i-want-split-a-text-file-into-multiple-files-by-a-column    
-        with open(input.seq, 'r') as fin:
-            for k, g in itertools.groupby(sort_table(fin), lambda l: l.split("_")[0]):
-                shutil.copyfile('laser/pileup2seq_output_HGDP_938.site', 'laser/pileup2seq_output_HGDP_938_{0}.site'.format(k))
-                with open('laser/pileup2seq_output_HGDP_938_{0}.seq'.format(k), 'w') as fout:
-                    for line in g:
-                        fout.write(line.strip() + '\n')
-
-rule laser_coord_group:
-    input:
-        ancestry_check_dir + '/pileup2seq_output_HGDP_938_{group}.seq'
-    output:
-        ancestry_check_dir + '/HGDP_938_{group}.RefPC.coord'
+        png = ancestry_check_dir + '/procrustesPCASamples.png',
+        txt = ancestry_check_dir + '/procrustesPCASamples.txt'
     params:
-        conf = hgdpDir + '/example_coord.conf',
-        out_prefix = ancestry_check_dir + '/HGDP_938_{group}'
+        ref = config['refPlinkFam'],
+        dir = ancestry_check_dir
     shell:
-        '. /etc/profile.d/modules.sh; module load laser;'
-        'laser -p {params.conf} -s {input} -o {params.out_prefix} -pca 1'
-
-rule laser_final_group:
-    input:
-        seq = ancestry_check_dir + '/pileup2seq_output_HGDP_938_{group}.seq',
-        coord = ancestry_check_dir + '/HGDP_938_{group}.RefPC.coord'
-    output:
-        ancestry_check_dir + '/HGDP_938_{group}.SeqPC.coord'
-    params:
-        conf = hgdpDir + '/example_final.conf',
-        out_prefix = ancestry_check_dir + '/HGDP_938_{group}'
-    shell:
-        '. /etc/profile.d/modules.sh; module load laser;'
-        'laser -p {params.conf} -s {input.seq} -c {input.coord} -o {params.out_prefix}'
-
-rule laser_plot_group:
-    input:
-        ref = ancestry_check_dir + '/HGDP_938_{group}.RefPC.coord',
-        data = ancestry_check_dir + '/HGDP_938_{group}.SeqPC.coord'
-    output:
-        ancestry_check_dir + '/Results_on_HGDP938_{group}.png'
-    shell:
-        '. /etc/profile.d/modules.sh; module load R;'
-        'cd modules/HGDP/; Rscript --vanilla plotHGDP_snakemake.r ../../{input.data} ../../{input.ref} ../../{output}'
+        '. /etc/profile.d/modules.sh; module load R;'    
+        'Rscript /CGF/Bioinformatics/Production/software/fastNGSadmix/R/doProcastesPCA.R {params.dir} {params.ref} {input.list} Samples;'
+        'mv procrustesPCASamples.* {params.dir}'        
+    

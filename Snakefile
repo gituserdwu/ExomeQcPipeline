@@ -37,7 +37,9 @@ GROUPS=[]
 SAMPLES = []
 sampleGroupDict = {}
 CONTROLS = ['PLCO', 'ACS', 'LC_IGC', 'EAGLE_IGC', 'CTRL', '_Normal']
-#CONTROLS = ['ACS', 'LC_IGC', 'EAGLE_IGC', 'CTRL', '_Normal']
+
+include: "modules/Snakemake_utils"
+
 ########################
 #Germline call
 
@@ -68,9 +70,7 @@ def getReport(wildcards):
 ########################
 #Somatic pair call
 
-  
-
-if config['somatic']: 
+if config['MODE'] == 'somatic': 
 
     pair_manifest = config['pairs']
     bamMatcher_dir = 'bamMatcher'
@@ -96,26 +96,37 @@ if config['somatic']:
 
     def get_normal(wildcards):
         (file) = normalDict[wildcards.sample]
-        return file   
-    
+        return file     
+
+    pair_manifest = config['pairs']
+    bamMatcher_dir = 'bamMatcher'
+    bamMatcherExe = config['BamMatcher']
     include: 'modules/Snakefile_bam_matcher'
     
+#launch all rules    
 include: 'modules/Snakefile_ancestry_plot'
 #include: 'modules/Snakefile_ancestry_plot_by_group'
 include: 'modules/Snakefile_contamination_plot'
 include: 'modules/Snakefile_coverage_plot'
 include: 'modules/Snakefile_duplication_plot'
-include: 'modules/Snakefile_exomeCQA_plot'
+include: 'modules/Snakefile_fastqc'   
+
+if not config['MODE'] == 'wgs':
+    include: 'modules/Snakefile_exomeCQA_plot'
+    
 include: 'modules/Snakefile_gender_plot'
 include: 'modules/Snakefile_pre_calling_plot'
-if config['somatic']:
+
+if config['MODE'] == 'somatic':
     include: 'modules/Snakefile_postcalling_plot_somatic'
 else:    
+    include: 'modules/Snakefile_relatedness'
     include: 'modules/Snakefile_postcalling_plot'
+
 include: 'modules/Snakefile_doc'
     
 rule all:
     input:
-        bamMatcher_dir + '/bam_matcher_report_all.txt' if config['somatic'] else [],
-        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS) if not config['somatic'] else [], 
+        bamMatcher_dir + '/bam_matcher_report_all.txt' if config['MODE'] == 'somatic' else [],
+        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS) if not config['MODE'] == 'somatic' else [], 
         word_report = 'word_doc/' + outName + '_QC_Report.docx'

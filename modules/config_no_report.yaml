@@ -28,8 +28,8 @@ coverage_check: TRUE
 duplication_check: TRUE
 exomeCQA_check: TRUE
 fastqc_check: TRUE
-gender_check: TRUE
+gender_check: FALSE
 pre_calling_check: TRUE
-post_calling_check: FALSE
-relatedness_check: TRUE
+post_calling_check: TRUE
+relatedness_check: FALSE
 bam-matcher_check: FALSE
