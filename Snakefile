@@ -104,7 +104,7 @@ if config['MODE'] == 'somatic':
     include: 'modules/Snakefile_bam_matcher'
     
 #launch all rules    
-include: 'modules/Snakefile_ancestry_plot'
+include: 'modules/Snakefile_ancestry_plot_laser'
 #include: 'modules/Snakefile_ancestry_plot_by_group'
 include: 'modules/Snakefile_contamination_plot'
 include: 'modules/Snakefile_coverage_plot'

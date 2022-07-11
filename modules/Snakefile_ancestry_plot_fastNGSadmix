@@ -1,0 +1,85 @@
+#!/usr/bin/python
+#import glob
+import operator
+import itertools
+import shutil 
+
+def sort_table(table, col=0):
+    return sorted(table, key=operator.itemgetter(col))
+
+rule angsd:
+    input:
+        bam = getBam,
+    output:
+        beagle = ancestry_check_dir + '/{sample}.beagle.gz'
+        #txt = outDir + 'fastNGSadmix/{sample}.qopt'
+    params:
+        refSite = config['fastNGSsite'],
+        temp = temp(ancestry_check_dir + '/{sample}_temp.beagle.gz'),
+        temp2 = temp(ancestry_check_dir + '/{sample}.beagle'),
+        prefix = ancestry_check_dir + '/{sample}_temp',
+        prefix2 = ancestry_check_dir + '/{sample}'
+    shell:
+        '. /etc/profile.d/modules.sh; module load angsd/0.935 tabix ;'
+        'angsd -i {input} -GL 2 -sites {params.refSite} -doGlf 2 -doMajorMinor 3 -minMapQ 30 -minQ 20 -doDepth 1 -doCounts 1 -out {params.prefix};'
+        '''zcat {params.temp}| sed 's/^chr//g' > {params.temp2} && bgzip {params.temp2} ;'''
+
+rule fastNGSadmix:
+    input:
+        beagle = ancestry_check_dir + '/{sample}.beagle.gz'
+    output:
+        ancestry_check_dir + '/{sample}.qopt'
+    params:
+        refPanel = config['fastNGSpanel'],
+        refInd = config['fastNGSiInd'],
+        prefix = ancestry_check_dir + '/{sample}'
+    benchmark:
+        ancestry_check_dir + '/benchmark/fastNGSadmix_{sample}.txt'
+    shell:
+        '. /etc/profile.d/modules.sh; module load R gcc/7.2.0;'   
+        '/CGF/Bioinformatics/Production/software/fastNGSadmix/fastNGSadmix -likes {input.beagle} -fname {params.refPanel} -Nname {params.refInd} -out {params.prefix} -whichPops CEU,CHB,YRI,PEL'
+
+rule fastNGSadmixPCA:
+    input:
+        qopt = ancestry_check_dir + '/{sample}.qopt',
+        beagle = ancestry_check_dir + '/{sample}.beagle.gz'
+    output:
+        barPlot = ancestry_check_dir + '/{sample}_admixBarplot.png',
+        covar = ancestry_check_dir + '/{sample}_covar.txt',
+        eigenValue = ancestry_check_dir + '/{sample}_eigenvals.txt',
+        eigenVector = ancestry_check_dir + '/{sample}_eigenvecs.txt',
+        pcaPlot = ancestry_check_dir + '/{sample}_PCAplot.pdf'
+        
+    params:
+        ref = config['refPlink'],
+        prefix = ancestry_check_dir + '/{sample}'
+    shell:
+        '. /etc/profile.d/modules.sh; module load R;'    
+        'Rscript /CGF/Bioinformatics/Production/software/fastNGSadmix/R/fastNGSadmixPCA.R -likes {input.beagle} -qopt {input.qopt} -out {params.prefix} -ref {params.ref};'
+
+rule listProcastes:
+    input:
+        qopt = expand(ancestry_check_dir + '/{sample}.qopt', sample = SAMPLES)
+    output:
+        ancestry_check_dir + '/procrustes.list'
+    run:
+        with open(output[0], 'w') as out:
+            for i in input.qopt:
+                s = os.path.basename(i)[:-5] 
+                out.write( s + '\n' )                
+        
+rule doProcastesPCA:
+    input:
+        covar = expand(ancestry_check_dir + '/{sample}_covar.txt', sample = SAMPLES),   
+        list = ancestry_check_dir + '/procrustes.list'        
+    output:
+        png = ancestry_check_dir + '/procrustesPCASamples.png',
+        txt = ancestry_check_dir + '/procrustesPCASamples.txt'
+    params:
+        ref = config['refPlinkFam'],
+        dir = ancestry_check_dir
+    shell:
+        '. /etc/profile.d/modules.sh; module load R;'    
+        'Rscript /CGF/Bioinformatics/Production/software/fastNGSadmix/R/doProcastesPCA.R {params.dir} {params.ref} {input.list} Samples;'
+        'mv procrustesPCASamples.* {params.dir}'        
+    
