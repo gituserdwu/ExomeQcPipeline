@@ -25,7 +25,7 @@ gender_check_dir = 'gender_check'
 postcalling_qc_dir = 'postcalling_qc'
 coverage_dir = 'coverage'
 contamination_dir = 'bamContamination'
-ancestry_check_dir = 'laser'
+ancestry_check_dir = 'ancestry'
 exomeCQA_dir = 'exomeCQA'
 hgdpDir = 'modules/HGDP'
 deduplication_dir = 'deduplication'
@@ -104,21 +104,25 @@ if config['MODE'] == 'somatic':
     include: 'modules/Snakefile_bam_matcher'
     
 #launch all rules    
-include: 'modules/Snakefile_ancestry_plot_laser'
+#include: 'modules/Snakefile_ancestry_plot'
 #include: 'modules/Snakefile_ancestry_plot_by_group'
 include: 'modules/Snakefile_contamination_plot'
 include: 'modules/Snakefile_coverage_plot'
 include: 'modules/Snakefile_duplication_plot'
-include: 'modules/Snakefile_fastqc'   
+#include: 'modules/Snakefile_fastqc'   
 
 if not config['MODE'] == 'wgs':
     include: 'modules/Snakefile_exomeCQA_plot'
+    #include: 'modules/Snakefile_ancestry_plot_laser'
+else:
+    include: 'modules/Snakefile_ancestry_plot_fastNGSadmix'
     
-include: 'modules/Snakefile_gender_plot'
+#include: 'modules/Snakefile_gender_plot'
 include: 'modules/Snakefile_pre_calling_plot'
 
 if config['MODE'] == 'somatic':
     include: 'modules/Snakefile_postcalling_plot_somatic'
+    include: 'modules/Snakefile_ancestry_plot_laser'
 else:    
     include: 'modules/Snakefile_relatedness'
     include: 'modules/Snakefile_postcalling_plot'

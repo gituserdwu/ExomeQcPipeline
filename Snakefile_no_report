@@ -99,7 +99,7 @@ if config['MODE'] == 'somatic':
         return file     
 
     if config['ancestry_check']:   
-        include: 'modules/Snakefile_ancestry_plot'
+        include: 'modules/Snakefile_ancestry_plot_laser'
     if config['bam-matcher_check']:    
         include: 'modules/Snakefile_bam_matcher'
     if config['contamination_check']:           
@@ -170,6 +170,9 @@ rule all:
         postcalling_qc_dir + '/variant_count_perKB.png' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
         postcalling_qc_dir + '/variant_count.png' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
         postcalling_qc_dir + '/titv_ratio.png' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
+        postcalling_qc_dir + '/callRate_bychr.jpeg' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
+        postcalling_qc_dir + '/callRate_bychr.quantile.txt' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
+        postcalling_qc_dir + '/callRate_byGroup.jpeg' if ( config['post_calling_check'] and not config['MODE'] == 'somatic' ) else [],
         postcalling_qc_dir + '/basechange_3d.png' if ( config['post_calling_check'] and config['MODE'] == 'somatic' ) else [],        
         postcalling_qc_dir + '/basechange_distribution.png' if ( config['post_calling_check'] and config['MODE'] == 'somatic' ) else [],
         'relatedness/relatedness.png' if ( config['relatedness_check'] and not config['MODE'] == 'somatic' ) else [],
