@@ -113,7 +113,7 @@ include: 'modules/Snakefile_duplication_plot'
 
 if not config['MODE'] == 'wgs':
     include: 'modules/Snakefile_exomeCQA_plot'
-    #include: 'modules/Snakefile_ancestry_plot_laser'
+    include: 'modules/Snakefile_ancestry_plot_laser'
 else:
     include: 'modules/Snakefile_ancestry_plot_fastNGSadmix'
     

@@ -29,7 +29,7 @@ if config['MODE'] == 'somatic':
                             NormalList.append(normal)                        
                             GroupNormalDict[GROUP] = 1
                 for i in GroupTumorDict:
-                    outfile.write( GROUP + '\t' + str(GroupTumorDict[GROUP])+ '\t' + str(GroupNormalDict[GROUP]) + '\n' )    
+                    outfile.write( i + '\t' + str(GroupTumorDict[i])+ '\t' + str(GroupNormalDict[i]) + '\n' )    
 else:
     rule table_sample_summary:
         input:
@@ -37,10 +37,12 @@ else:
             single = lambda wildcards: [bam_location + '/' + sampleGroupDict[item] + '/' + item + '.bam' for item in sampleGroupDict.keys()] #need to use for loop to include all sample single bam files
         output:
             'word_doc/sample_summary.txt'
+        params:
+            postcalling_qc_dir + '/titv.txt'
         run:
             GroupDict = {}
             with open(output[0], 'w') as outfile: 
-                outfile.write( 'DISEASE_GROUP\tSUBJECT_COUNTS' + '\n' )
+                outfile.write( 'DISEASE_GROUP\tSUBJECT_COUNTS\tSUBJECT_COUNTS_POSTFILTER' + '\n' )
                 for fname in input.single:   
                     #with open(fname, 'r') as infile: no need to open file
                     GROUP=os.path.basename(os.path.dirname(fname))
@@ -49,7 +51,12 @@ else:
                     else:
                         GroupDict[GROUP] = 1
                 for i in GroupDict:
-                    outfile.write( GROUP + '\t' + str(GroupDict[GROUP]) + '\n' )
+                    count = 0
+                    a_file = open(params[0], 'r')
+                    for number, line in enumerate(a_file): 
+                        if line.startswith(i): 
+                            count += 1  
+                    outfile.write( i + '\t' + str(GroupDict[i]) + '\t' + str(count) + '\n' )
                 
 rule word_doc:
     input:
@@ -60,7 +67,7 @@ rule word_doc:
         top10_contamination = 'bamContamination/top10_contamination_rate.txt',
         aveCov_plot = 'coverage/Average_Coverage_caco.png', 
         sex_plot = 'gender_check/gender_check.png',
-        ancestry_plot = 'laser/procrustesPCASamples.png',
+        ancestry_plot = ancestry_check_dir + '/procrustesPCASamples.png',
         subject_dup_plot = 'deduplication/subject_dup_rate.png',
         top10_dup = 'deduplication/top10_dup_rate.txt',
         insertSize_plot = 'precalling_qc/insertSize.png',
