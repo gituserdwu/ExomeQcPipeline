@@ -85,6 +85,7 @@ rule word_doc:
         botton10_titv = 'postcalling_qc/titv_outlier10.txt' if not config['MODE'] == 'somatic' else [],
         relatedness = 'out.relatedness2' if not config['MODE'] == 'somatic' else [],
         relatedness_hist = relatedness_dir + '/relatedness_hist.png' if not config['MODE'] == 'somatic' else [],
+        missingRate_hist = 'postcalling_qc/callRate_byGroup.jpeg' if not config['MODE'] == 'somatic' else [],
         basechange = postcalling_qc_dir + '/basechange_3d.png' if config['MODE'] == 'somatic' else 'postcalling_qc/basechange_all.png',
         basechange_distribution = postcalling_qc_dir + '/basechange_distribution.png'  if config['MODE'] == 'somatic' else [],
         bam_matcher_plot = bamMatcher_dir + '/bam_matcher_check.png' if config['MODE'] == 'somatic' else []
@@ -229,8 +230,6 @@ my_doc <- read_docx(path = "''' + input.template + '''") %>%
     body_replace_all_text("EXOMCQA_EXON_REPORT", "''' + str(exomeCQAexonReport) + '''", fixed=TRUE) %>% 
     body_replace_all_text("PRECALLING_QC_REPORT", "''' + str(precallingQCReport) + '''", fixed=TRUE) %>%
     body_replace_all_text("LASER_DIR", "''' + str(laserDir) + '''", fixed=TRUE) %>%
-    body_replace_all_text("GROUP_BASECHANGE", "''' + str(groupBasechangeDir) + '''", fixed=TRUE) %>%
-    body_replace_all_text("RELATEDNESS_REPORT", "''' + str(relatednessReport) + '''", fixed=TRUE) %>%
     
     cursor_reach(keyword = "Table 1. Subject count breakdown before QC") %>%
     body_add_flextable(value = ft_1) %>%
@@ -246,9 +245,31 @@ my_doc <- read_docx(path = "''' + input.template + '''") %>%
 
     cursor_reach(keyword = "Figure 3. coverage scatter plot for all exome samples, with cases and controls separated") %>%
     slip_in_img(src = "''' + input.aveCov_plot + '''", width = 5, height = 5, pos = "before") %>%
-
+    '''
+        if not config['MODE'] == 'wgs':           
+            rTxt += '''           
+    cursor_reach(keyword = "Table 4a. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for US score") %>%
+    body_add_flextable(value = ft_4a) %>%	
+    cursor_reach(keyword = "Table 4b. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for CCS score") %>%
+    body_add_flextable(value = ft_4b) %>%
+        
+    cursor_reach(keyword = "Figure 4. the histogram of UE score and CCS Score for all sample") %>%
+    slip_in_img(src = "''' + input.ccs_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
+    slip_in_img(src = "''' + input.ue_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
+    cursor_reach(keyword = "Table 5.  10 regions with highest Unevenness Score") %>%
+    body_add_flextable(value = ft_5) %>%
+    
+    cursor_reach(keyword = "Figure 5a. histogram for all Fold 80 base penalty for samples") %>%
+    slip_in_img(src = "''' + input.fold80_plot + '''", width = 5, height = 5, pos = "before") %>%   
+    cursor_reach(keyword = "Figure 5b. boxplot for median and mean insert sizes") %>%
+    slip_in_img(src = "''' + input.insertSize_plot + '''", width = 5, height = 5, pos = "before") %>% '''
+        else:    
+            rTxt += '''     
     cursor_reach(keyword = "Figure 5. boxplot for median and mean insert sizes") %>%
-    slip_in_img(src = "''' + input.insertSize_plot + '''", width = 5, height = 5, pos = "before") %>%                  
+    slip_in_img(src = "''' + input.insertSize_plot + '''", width = 5, height = 5, pos = "before") %>% '''
+    
+        rTxt += '''
+              
     cursor_reach(keyword = "Figure 6. boxplot of average oxidation q score and lowest oxidation q score") %>%
     slip_in_img(src = "''' + input.oxidation_plot + '''", width = 5, height = 5, pos = "before") %>%
     cursor_reach(keyword = "Figure 7. boxplot of Lowest Preadapter and Baitbias Total Score for all samples") %>%
@@ -269,6 +290,9 @@ my_doc <- read_docx(path = "''' + input.template + '''") %>%
     slip_in_img(src = "''' + input.bam_matcher_plot + '''", width = 5, height = 5, pos = "before") '''
         else:    
             rTxt += '''     
+    body_replace_all_text("GROUP_BASECHANGE", "''' + str(groupBasechangeDir) + '''", fixed=TRUE) %>%
+    body_replace_all_text("RELATEDNESS_REPORT", "''' + str(relatednessReport) + '''", fixed=TRUE) %>%
+    
     cursor_reach(keyword = "Figure 10a. Ensemble filtered variant count by sample") %>%
     slip_in_img(src = "''' + input.total_count + '''", width = 5, height = 5, pos = "before") %>%
     cursor_reach(keyword = "Table 6a. 10 samples with lowest variant count ") %>%
@@ -279,25 +303,11 @@ my_doc <- read_docx(path = "''' + input.template + '''") %>%
     slip_in_img(src = "''' + input.titv_ratio + '''", width = 5, height = 5, pos = "before") %>%
     cursor_reach(keyword = "Figure 10c. base change counts per disease group") %>%
     slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 10d. missing call rate per disease group") %>%
+    slip_in_img(src = "''' + input.missingRate_hist + '''", width = 5, height = 5, pos = "before") %>%
     cursor_reach(keyword = "Figure 11. off-diagonal pairwise sample relatedness kinship coefficient") %>%
     slip_in_img(src = "''' + input.relatedness_hist + '''", width = 5, height = 5, pos = "before") %>%'''
     
-        if not config['MODE'] == 'wgs':           
-            rTxt += '''           
-    cursor_reach(keyword = "Table 4a. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for US score") %>%
-    body_add_flextable(value = ft_4a) %>%	
-    cursor_reach(keyword = "Table 4b. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for CCS score") %>%
-    body_add_flextable(value = ft_4b) %>%
-        
-    cursor_reach(keyword = "Figure 4. the histogram of UE score and CCS Score for all sample") %>%
-    slip_in_img(src = "''' + input.ccs_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
-    slip_in_img(src = "''' + input.ue_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
-    cursor_reach(keyword = "Table 5.  10 regions with highest Unevenness Score") %>%
-    body_add_flextable(value = ft_5) %>%
-    
-    cursor_reach(keyword = "Figure 5a. histogram for all Fold 80 base penalty for samples") %>%
-    slip_in_img(src = "''' + input.fold80_plot + '''", width = 5, height = 5, pos = "before") %>%   
- '''   
         rTxt += '''
 print(my_doc, target = "''' + output.doc + '''")
 '''
