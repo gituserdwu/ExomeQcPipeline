@@ -3,7 +3,7 @@
 ExomeQcPipeline can be excuted in three modes: germline wes mode,germline wgs mode and somatic mode. Difference between the three modes are 
 1. somatic mode contains exclusive modules of bam-matcher to check tumor normal pairs.
 2. somatic mode post calling qc contains only base change check; germline mode post calling qc contains total filtered variant count, ti/tv ratio and base change check. 
-3, wgs mode has no exomeCQA module the other two mode include
+3. wgs mode has no exomeCQA module the other two mode include
 
 Also the pipeline has two branches: report generation branch and non report generation branch:
 1. report generation branch: will automaticlly generate all modules according to somatic/germline setting in the config.yaml file. Output report will be in word_doc folder.
