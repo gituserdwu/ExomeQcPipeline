@@ -6,15 +6,15 @@ import os
        
 rule run_relatedness2:
     input:
-        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf'
+        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf.gz'
     output:
         offDiagonalReport = relatedness_dir + '/out_off_diagonal.relatedness2',
         pairwiseReport = 'out.relatedness2'
     params:
-        totalSamp = len(SAMPLES)  
+        totalSamp = len(SAMPLES)
     shell:
         '. /etc/profile.d/modules.sh; module load zlib vcftools;'       
-        'vcftools --vcf {input} --relatedness2;'
+        'vcftools --gzvcf {input} --relatedness2;'
         'total={params.totalSamp};'
         'for i in `seq 1 ${{total}}`;do samp=`echo "${{i}}*${{total}}+1" | bc -l`;order=`echo "${{total}}-${{i}}" | bc -l`; head -n ${{samp}} {output.pairwiseReport} | tail -n ${{order}};done | grep -v CTRL > {output.offDiagonalReport}'	   
 

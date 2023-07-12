@@ -2,20 +2,21 @@
 project: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/YOUR_QC_DIR
 manifest: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Manifest/SR0443-004-ANALYSIS-MANIFEST.csv
 bam_location: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/bam_location
-precalling_report: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/YOUR_QC_DIR/pre_calling_qc_report.txt
+precalling_report: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/QC/pre_calling_qc_report.txt
 ref: /DCEG/CGF/Resources/Data/genome/hg19_canonical_correct_chr_order.fa
 capturekit: /DCEG/Projects/Exome/SequencingData/BED_FILES/customized_capturekit/161006_HG19_Kid-Lung-Extra_EZ_HX3_primary_targets.bed
 #/DCEG/Projects/Exome/SequencingData/BED_FILES/NV3UTR_NV3_nopadding_corrected.bed
 exomeCQA_bed: /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/bedfiles/Kid-Lung-Extra_capture_targets.bed
 exomeCQA: /CGF/Bioinformatics/Production/software/ExomeCQA/ExomeCQA
 population_file: modules/HGDP/example.id #NA when no population file can be provided
+MODE: somatic # wgs,wes, somatic
+tmpDir: /scratch/fz32402_qc
 
 ##germline required files
 ensemble_vcf: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Results/annotation/merged_ensemble_voting_passed_annotated.vcf
 doc_template_germline: ExomeQcPipeline_Template_interim.docx
 
 ##somatic required files
-somatic: TRUE
 BamMatcher: /CGF/Bioinformatics/Production/software/bam-matcher.py
 pairs: /DCEG/Projects/Exome/builds/build_SR0443-004_somatic_UMI_25938/Manifest/pairs.txt
 doc_template_somatic: ExomeQcPipeline_Somatic_Template_interim.docx
@@ -32,3 +33,24 @@ gender_check: TRUE
 pre_calling_check: FALSE
 post_calling_check: TURE
 relatedness_check: TRUE
+
+##parameter files
+##fastNGSsite: /CGF/Bioinformatics/Production/Wen/20210208_hongkongbreast_wgs/ref_1000G/shapeit2_integrated_v1a.GRCh38.20181129.phased.plink_chr.sites
+##fastNGSpanel: /CGF/Bioinformatics/Production/Wen/20210208_hongkongbreast_wgs/ref_1000G/refPanel_shapeit2_integrated_v1a.GRCh38.20181129.phased.plink.txt
+##fastNGSiInd: /CGF/Bioinformatics/Production/Wen/20210208_hongkongbreast_wgs/ref_1000G/nInd_shapeit2_integrated_v1a.GRCh38.20181129.phased.plink.txt
+##refPlink: /CGF/Bioinformatics/Production/Wen/data1000genomes/shapeit2_integrated_v1a.GRCh38.20181129.phased.plink
+##refPlinkFam: /CGF/Bioinformatics/Production/Wen/data1000genomes/shapeit2_integrated_v1a.GRCh38.20181129.phased.plink.fam
+fastNGSsite: /CGF/Bioinformatics/Production/software/fastNGSadmix/data1000genomes/1000genomesRefPanel_chr.sites
+fastNGSpanel: /CGF/Bioinformatics/Production/software/fastNGSadmix/data1000genomes/refPanel_1000genomesRefPanel.txt
+fastNGSiInd: /CGF/Bioinformatics/Production/software/fastNGSadmix/data1000genomes/nInd_1000genomesRefPanel.txt
+refPlink: /CGF/Bioinformatics/Production/software/fastNGSadmix/data1000genomes/1000genomesRefPanel
+refPlinkFam: /CGF/Bioinformatics/Production/software/fastNGSadmix/data1000genomes/1000genomesRefPanel.fam
+omniVcf: /DCEG/CGF/Bioinformatics/Production/BZhu/verifyBamID/Omni25_genotypes_1525_samples_v2.b37.PASS.ALL.sites_with_chr.vcf
+#
+#fastNGSsite: /CGF/Bioinformatics/Production/Wen/20210208_hongkongbreast_wgs/ref_1000G/shapeit2_integrated_v1a.GRCh38.20181129.phased.plink_chr.sites
+#fastNGSpanel: /CGF/Bioinformatics/Production/Wen/20210208_hongkongbreast_wgs/ref_1000G/refPanel_shapeit2_integrated_v1a.GRCh38.20181129.phased.plink.txt
+#fastNGSiInd: /CGF/Bioinformatics/Production/Wen/20210208_hongkongbreast_wgs/ref_1000G/nInd_shapeit2_integrated_v1a.GRCh38.20181129.phased.plink.txt
+#refPlink: /CGF/Bioinformatics/Production/Wen/data1000genomes/shapeit2_integrated_v1a.GRCh38.20181129.phased.plink
+#refPlinkFam: /CGF/Bioinformatics/Production/Wen/data1000genomes/shapeit2_integrated_v1a.GRCh38.20181129.phased.plink.fam
+#omniVcf: /DCEG/CGF/Bioinformatics/Production/BZhu/verifyBamID/Omni25_genotypes_1525_samples_v2.b38.PASS.ALL.sites_with_chr.vcf
+

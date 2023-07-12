@@ -1,8 +1,9 @@
 ## Introduction of ExomeQcPipeline
 
-ExomeQcPipeline can be excuted in two modes: germline mode and somatic mode. Difference between the two modes is 
+ExomeQcPipeline can be excuted in three modes: germline wes mode,germline wgs mode and somatic mode. Difference between the three modes are 
 1. somatic mode contains exclusive modules of bam-matcher to check tumor normal pairs.
 2. somatic mode post calling qc contains only base change check; germline mode post calling qc contains total filtered variant count, ti/tv ratio and base change check. 
+3, wgs mode has no exomeCQA module the other two mode include
 
 Also the pipeline has two branches: report generation branch and non report generation branch:
 1. report generation branch: will automaticlly generate all modules according to somatic/germline setting in the config.yaml file. Output report will be in word_doc folder.
@@ -20,6 +21,14 @@ __None report branch:__
 
 __Report branch:__
 - Fill all items in modules/config.yaml
+  - Manifest for for the build
+  - Input bam file folder (bam files from different groups should be is different subfolders)
+  - Pre-calling qc report from secondary analysis pipeline
+  - Capturekit bed file (somatic and wes only)
+  - exomeCQA bed file (somatic and wes only)
+  - vcf file jointly called from input bam files
+  - paired tumor normal files (somatic mode only)
+  - somatic pair call output folder (output from CGR somaticseq2 pipeline)
 
 ## How to run:
 
@@ -54,6 +63,5 @@ __somatic:__
    
 2, Doc report generated but figures are all unviewable. 
    run `chmod -R 775 ExomeQcPipeline`   
-
 
 

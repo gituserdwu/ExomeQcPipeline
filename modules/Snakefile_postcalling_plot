@@ -16,11 +16,12 @@ import pandas as pd
 
 rule run_basechange:
     input:
-        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf'
+        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf.gz'
     output:
         postcalling_qc_dir + '/variants_annotated_basechange.txt'
     shell:
-        'perl ./modules/vcfFilter_count_base_change.pl {input} {output}'
+        '. /etc/profile.d/modules.sh; module load bcftools;'
+        'bcftools view {input} | perl ./modules/vcfFilter_count_base_change.pl {input} {output}'
 
 rule postcalling_qc_table:
     input:

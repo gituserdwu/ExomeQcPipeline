@@ -109,7 +109,7 @@ if config['MODE'] == 'somatic':
 include: 'modules/Snakefile_contamination_plot'
 include: 'modules/Snakefile_coverage_plot'
 include: 'modules/Snakefile_duplication_plot'
-#include: 'modules/Snakefile_fastqc'   
+include: 'modules/Snakefile_fastqc'   
 
 if not config['MODE'] == 'wgs':
     include: 'modules/Snakefile_exomeCQA_plot'
@@ -117,7 +117,7 @@ if not config['MODE'] == 'wgs':
 else:
     include: 'modules/Snakefile_ancestry_plot_fastNGSadmix'
     
-#include: 'modules/Snakefile_gender_plot'
+include: 'modules/Snakefile_gender_plot'
 include: 'modules/Snakefile_pre_calling_plot'
 
 if config['MODE'] == 'somatic':
