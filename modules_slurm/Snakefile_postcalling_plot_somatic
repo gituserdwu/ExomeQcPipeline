@@ -1,0 +1,115 @@
+#!/usr/bin/python
+#import glob
+import sys
+import os
+from glob import glob
+
+
+#rule all:
+#    input:
+#        total_count = postcalling_qc_dir + '/variant_count.png',
+#        titv_ratio = postcalling_qc_dir + '/titv_ratio.png',
+#        #lowqual_basechange = postcalling_qc_dir + '/lowqual_basechange.png',
+#        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS), 
+#        basechange_all = postcalling_qc_dir + '/basechange_all.png',
+
+#rule run_filter:
+#    input:
+#        ensemble_dir + '/{sample}_5callers_voting.vcf'
+#    output:
+#        postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf'
+#    params:
+#        bed = bedFile,
+#        prefix = postcalling_qc_dir + '/{sample}_intersection_region_passed'
+#    shell:
+#        '. /etc/profile.d/modules.sh; module load vcftools;'
+#        '''awk -F"\t" '{{if ( $1 ~ "^#" || $7 ~ "PASS;" ){{print}}}}' {input} | vcftools --vcf - --bed {params.bed}  --recode --recode-INFO-all --out {params.prefix};'''
+        
+rule run_basechange:
+    input:
+        expand(postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf', sample = SAMPLES)
+    output:
+        basechange = postcalling_qc_dir + '/ensemble_basechange.txt',
+        vaf = postcalling_qc_dir + '/ensemble_vaf_dp.txt'        
+    shell:
+        'sh ./modules/basechange_somatic.sh {output.basechange} {output.vaf} {input}'
+        
+rule basechange_plot:
+    input:
+        postcalling_qc_dir + '/ensemble_basechange.txt'  
+    output:
+        plot_3d = postcalling_qc_dir + '/basechange_3d.png',        
+        plot_bar = postcalling_qc_dir + '/basechange_bar.png',    
+        R = postcalling_qc_dir + '/basechange.R',
+        Rout = postcalling_qc_dir + '/basechange.R.out'
+    run:
+        rTxt = '''
+        library(plotrix)
+        library(epade)
+        library(ggplot2)
+        library(reshape2)
+        library(plyr)
+        
+        data <- read.table("''' + str(input) + '''", header = TRUE, sep = "	")
+
+        names(data) <- c('sample', 'A>T','A>C','A>G','T>A','T>C','T>G','C>A','C>T','C>G','G>A', 'G>T', 'G>C', 'Indels')
+        data.melt=melt(data)
+        data.total=ddply(data.melt, "variable", numcolwise(sum))
+        data.total.sort=data.total[with(data.total, order(data.total$value)), ]
+        data.sort=data[with(data, rev(order(data[,toString(data.total.sort$variable[length(data.total.sort$variable)])]))), ]
+        data.sort$sample <- factor(data.sort$sample, levels = data.sort$sample)
+        data.melt$sample <- factor(data.melt$sample, levels = data.sort$sample)
+        data.total.sort$variable <- factor(data.total.sort$variable, levels = data.total.sort$variable)
+        data.melt$variable <- factor(data.melt$variable, levels = data.total.sort$variable)
+        png("''' + str(output.plot_bar) + '''")
+        ggplot(data.melt, aes(y=value, x=sample, fill=variable)) +
+        geom_bar(position="stack", stat="identity") +
+        labs(x = "Samples", y = "Variant Count") +
+        theme(axis.text.x=element_blank(), axis.ticks.x=element_blank()) +
+        scale_fill_manual(values=c("#7FC97F","#BEAED4","#FDC086","#FFFF99","#386CB0","#F0027F","#BF5B17","#666666","#1B9E77","#D95F02","#7570B3","#E7298A","#66A61E"))
+        
+        data[,1] <-NULL
+        metrics<-as.matrix(data)
+        png("''' + str(output.plot_3d) + '''")
+        bar3d.ade(t(metrics), wall=3,xw=2, zw=1,alpha=0.2,col=c(14,2,3,4,5,6,7,8,9,10,11,12,13),xticks=seq(1, nrow(data)))
+        dev.off()
+        
+        dev.off()        
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+        
+rule basechange_distribution_plot:
+    input:
+        postcalling_qc_dir + '/ensemble_vaf_dp.txt'  
+    output:
+        plot = postcalling_qc_dir + '/basechange_distribution.png',        
+        R = postcalling_qc_dir + '/basechange_distribution.R',
+        Rout = postcalling_qc_dir + '/basechange_distribution.R.out'
+    run:
+        rTxt = '''
+        library(ggplot2)
+
+        data <- read.table("''' + str(input) + '''", header = FALSE, sep = "\t")
+        names(data) <- c("SAMP", "CHR", "POS", "BaseChange", "RD", "VAF")
+        stat_box_data <- function(y) {
+            return( 
+                data.frame(
+                y = max(y) * 0.75,
+                label = length(y)
+                )
+            )
+        }
+
+        png("''' + str(output.plot) + '''")
+        ggplot(data=data, aes(x=data$BaseChange, y=VAF)) +
+        geom_violin(draw_quantiles = c(0.25, 0.5, 0.75),adjust=2,scale = "width", add = "boxplot")+ 
+        stat_summary(fun.data = stat_box_data,geom = "text",aes(group=data$BaseChange),hjust = 0.5, vjust = 0.9, position = position_dodge(0.9) ) +
+        labs(x = "base change", y = "VAF") 
+        dev.off()
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')        
+        

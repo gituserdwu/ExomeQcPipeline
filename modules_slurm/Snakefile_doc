@@ -1,0 +1,325 @@
+#!/usr/bin/python
+import os
+
+#outName = os.path.basename(os.path.dirname(config['project']))
+if config['MODE'] == 'somatic': 
+    rule table_sample_summary_somatic:
+        input:
+            pair_manifest
+        output:
+            'word_doc/sample_summary.txt'
+        run:
+            GroupTumorDict = {}
+            GroupNormalDict = {}
+            NormalList = []
+            with open(output[0], 'w') as outfile, open(input[0]) as f:
+                outfile.write( 'DISEASE_GROUP\tTUMOR_COUNTS\tNORMAL_COUNTS' + '\n' )            
+                for line in f:
+                    GROUP=os.path.basename(line.split('\t')[0]).split('_')[0]
+                    tumor=os.path.basename(line.split('\t')[0])[:-4]                
+                    normal=os.path.basename(line.split('\t')[1])[:-4] 
+                    if GROUP in GroupTumorDict:
+                        GroupTumorDict[GROUP] += 1     
+                        if normal not in NormalList:
+                            NormalList.append(normal)
+                            GroupNormalDict[GROUP] += 1   
+                    else:
+                        GroupTumorDict[GROUP] = 1
+                        if normal not in NormalList:
+                            NormalList.append(normal)                        
+                            GroupNormalDict[GROUP] = 1
+                for i in GroupTumorDict:
+                    outfile.write( i + '\t' + str(GroupTumorDict[i])+ '\t' + str(GroupNormalDict[i]) + '\n' )    
+else:
+    rule table_sample_summary:
+        input:
+            #single = lambda wildcards: [bam_location + '/' + group + '/' + item for item in sampleGroupDict.keys() + '.bam']
+            single = lambda wildcards: [bam_location + '/' + sampleGroupDict[item] + '/' + item + '.bam' for item in sampleGroupDict.keys()] #need to use for loop to include all sample single bam files
+        output:
+            'word_doc/sample_summary.txt'
+        params:
+            postcalling_qc_dir + '/ensemble_basechange.txt' if config['MODE'] == 'tumor_only' else postcalling_qc_dir + '/titv.txt' 
+        run:
+            GroupDict = {}
+            with open(output[0], 'w') as outfile: 
+                outfile.write( 'DISEASE_GROUP\tSUBJECT_COUNTS\tSUBJECT_COUNTS_POSTFILTER' + '\n' )
+                for fname in input.single:   
+                    #with open(fname, 'r') as infile: no need to open file
+                    GROUP=os.path.basename(os.path.dirname(fname))
+                    if GROUP in GroupDict:
+                        GroupDict[GROUP] += 1
+                    else:
+                        GroupDict[GROUP] = 1
+                for i in GroupDict:
+                    count = 0
+                    a_file = open(params[0], 'r')
+                    for number, line in enumerate(a_file): 
+                        if line.startswith(i): 
+                            count += 1  
+                    outfile.write( i + '\t' + str(GroupDict[i]) + '\t' + str(count) + '\n' )
+                
+rule word_doc:
+    input:
+        template = config['doc_template_somatic'] if config['MODE'] == 'somatic' else config['doc_template_germline'],
+        sample_summary = 'word_doc/sample_summary.txt',
+        fastqc = 'fastqc/multiqc_report.html', 
+        contamination_plot = 'bamContamination/bam_contamination_rate.png',
+        top10_contamination = 'bamContamination/top10_contamination_rate.txt',
+        aveCov_plot = 'coverage/Average_Coverage_caco.png', 
+        sex_plot = 'gender_check/gender_check.png',
+        ancestry_plot = ancestry_check_dir + '/procrustesPCASamples.png',
+        subject_dup_plot = 'deduplication/subject_dup_rate.png',
+        top10_dup = 'deduplication/top10_dup_rate.txt',
+        insertSize_plot = 'precalling_qc/insertSize.png',
+        fold80_plot = 'precalling_qc/fold80.png' if not config['MODE'] == 'wgs' else [],
+        seqArtifact_plot = 'precalling_qc/seq_artifact.png',
+        oxidation_plot = 'precalling_qc/oxidation.png',
+        summary_ue = 'exomeCQA/summary_ue.txt' if not config['MODE'] == 'wgs' else [],		
+        summary_ccs = 'exomeCQA/summary_ccs.txt' if not config['MODE'] == 'wgs' else [],
+        ccs_plot = 'exomeCQA/cohort_coverage_sparseness.png' if not config['MODE'] == 'wgs' else [],
+        ue_plot = 'exomeCQA/unevenness.png' if not config['MODE'] == 'wgs' else [],
+        top10_ue = 'exomeCQA/top10_ue.txt' if not config['MODE'] == 'wgs' else [],
+        total_count = 'postcalling_qc/variant_count.png' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        botton10_count = 'postcalling_qc/variant_outlier10.txt' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        titv_ratio = 'postcalling_qc/titv_ratio.png' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        botton10_titv = 'postcalling_qc/titv_outlier10.txt' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        relatedness = 'out.relatedness2' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        relatedness_hist = relatedness_dir + '/relatedness_hist.png' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        missingRate_hist = 'postcalling_qc/callRate_byGroup.jpeg' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        basechange = postcalling_qc_dir + '/basechange_3d.png' if config['MODE'] == 'somatic' or config['MODE'] == 'tumor_only' else 'postcalling_qc/basechange_all.png',
+        basechange_distribution = postcalling_qc_dir + '/basechange_distribution.png'  if config['MODE'] == 'somatic' or config['MODE'] == 'tumor_only' else [],
+        bam_matcher_plot = bamMatcher_dir + '/bam_matcher_check.png' if config['MODE'] == 'somatic' else []
+    output:
+        doc = 'word_doc/' + outName + '_QC_Report.docx', 
+        R = 'word_doc/doc.R',
+        Rout = 'word_doc/doc.R.out'
+    run:
+        totSubs = len(SAMPLES)
+        buildName = outName.replace("build_", "")
+        bed = bedFile if not config['MODE'] == 'wgs' else []
+        exomeCQAgeneReport = exomeCQA_dir + '/exomeCQA_gene.chrALL' if not config['MODE'] == 'wgs' else []
+        exomeCQAexonReport = exomeCQA_dir + '/exomeCQA_exon.chrALL' if not config['MODE'] == 'wgs' else []
+        geneNum = len(open(exomeCQAgeneReport).readlines(  )) if not config['MODE'] == 'wgs' else []
+        exonNum = len(open(exomeCQAexonReport).readlines(  )) if not config['MODE'] == 'wgs' else []
+        precallingQCReport = precallingReport
+        laserDir = project.rstrip('/') + '/ExomeQcPipeline/' + ancestry_check_dir
+        fasqc = project.rstrip('/') + '/ExomeQcPipeline/fastqc/multiqc_report.html'
+        groupBasechangeDir = project.rstrip('/') + '/ExomeQcPipeline/' + postcalling_qc_dir
+        relatednessReport = project.rstrip('/') + '/ExomeQcPipeline/relatedness/out.relatedness2'
+        rTxt = '''library(officer)
+library(magrittr)
+library(flextable)
+
+table_1 <- read.table("''' + input.sample_summary + '''", header = TRUE)
+
+ft_1 <- regulartable(table_1, col_keys = names(table_1)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_1 <- align(ft_1, align = "center")
+
+table_2 <- read.table("''' + input.top10_dup + '''", header = TRUE)
+
+ft_2 <- regulartable(table_2, col_keys = names(table_2)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_2 <- align(ft_2, align = "center")
+
+table_3 <- read.table("''' + input.top10_contamination + '''", header = TRUE)
+
+ft_3 <- regulartable(table_3, col_keys = names(table_3)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_3 <- align(ft_3, align = "center")
+
+'''
+
+        if config['MODE'] == 'wgs' or config['MODE'] == 'wes':
+            rTxt += '''
+table_6a <- read.table("''' + input.botton10_count + '''", header = TRUE)
+
+ft_6a <- regulartable(table_6a, col_keys = names(table_6a)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_6a <- align(ft_6a, align = "center")
+
+table_6b <- read.table("''' + input.botton10_titv + '''", header = TRUE)
+
+ft_6b <- regulartable(table_6b, col_keys = names(table_6b)) %>%
+    fontsize(size = 8, part = "all") %>%
+    fontsize(i = 1, size = 10, part = "header") %>%
+    color(i = 1, color = "#007FA6", part = "header") %>%
+    theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+    autofit()
+ft_6b <- align(ft_6b, align = "center")'''
+
+        if not config['MODE'] == 'wgs':
+            rTxt += '''  
+    summary_ue <- read.table("''' + input.summary_ue + '''", header = TRUE, fill=TRUE)
+    min = summary_ue$Min.
+    q1 = summary_ue$X1st
+    med = summary_ue$Qu.
+    mean = summary_ue$Median
+    q3 = summary_ue$Mean
+    max=summary_ue$X3rd
+    table_4a <- data.frame(min=min, q1=q1, med=med, mean=mean, q3=q3, max=max)
+
+    ft_4a <- regulartable(table_4a, col_keys = names(table_4a)) %>%
+        fontsize(size = 8, part = "all") %>%
+        fontsize(i = 1, size = 10, part = "header") %>%
+        color(i = 1, color = "#007FA6", part = "header") %>%
+        theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+        autofit()
+    ft_4a <- align(ft_4a, align = "center")
+
+    double_format <- function(x){
+      sprintf("%.2f", x)
+    }
+
+    summary_ccs <- read.table("''' + input.summary_ccs + '''", header=TRUE, fill=TRUE)
+    min = summary_ccs$Min.
+    q1 = summary_ccs$X1st
+    med = summary_ccs$Qu.
+    mean = summary_ccs$Median
+    q3 = summary_ccs$Mean
+    max=summary_ccs$X3rd
+    table_4b <- data.frame(min=min, q1=q1, med=med, mean=mean, q3=q3, max=max)
+
+    ft_4b <- regulartable(table_4b, col_keys = names(table_4b)) %>%
+        set_formatter("Min" = double_format, "1st.Qu" = double_format, "Median" = double_format, "Mean" = double_format, "3rd.Qu" = double_format, "Max" = double_format) %>%
+        fontsize(size = 8, part = "all") %>%
+        fontsize(i = 1, size = 10, part = "header") %>%
+        color(i = 1, color = "#007FA6", part = "header") %>%
+        theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+        autofit()
+    ft_4b <- align(ft_4b, align = "center")
+
+
+    table_5 <- read.table("''' + input.top10_ue + '''", header = TRUE)
+
+    ft_5 <- regulartable(table_5, col_keys = names(table_5)) %>%
+        fontsize(size = 8, part = "all") %>%
+        fontsize(i = 1, size = 10, part = "header") %>%
+        color(i = 1, color = "#007FA6", part = "header") %>%
+        theme_zebra(odd_header = "transparent", even_header = "transparent") %>%
+        autofit()
+    ft_5 <- align(ft_5, align = "center")            
+ 
+    '''   
+    
+        rTxt += '''
+my_doc <- read_docx(path = "''' + input.template + '''") %>%
+    body_replace_all_text("SAMPLE_NUM", "''' + str(totSubs) + '''", fixed=TRUE) %>%
+    body_replace_all_text("BUILD_NAME", "''' + str(buildName) + '''", fixed=TRUE) %>%
+    body_replace_all_text("BED_FILE", "''' + str(bed) + '''", fixed=TRUE) %>%
+    body_replace_all_text("FASTQC_REPORT", "''' + str(fasqc) + '''", fixed=TRUE) %>%
+    body_replace_all_text("GENE_NUM", "''' + str(geneNum) + '''", fixed=TRUE) %>% 
+    body_replace_all_text("EXON_NUM", "''' + str(exonNum) + '''", fixed=TRUE) %>%
+    body_replace_all_text("EXOMCQA_GENE_REPORT", "''' + str(exomeCQAgeneReport) + '''", fixed=TRUE) %>%
+    body_replace_all_text("EXOMCQA_EXON_REPORT", "''' + str(exomeCQAexonReport) + '''", fixed=TRUE) %>% 
+    body_replace_all_text("PRECALLING_QC_REPORT", "''' + str(precallingQCReport) + '''", fixed=TRUE) %>%
+    body_replace_all_text("LASER_DIR", "''' + str(laserDir) + '''", fixed=TRUE) %>%
+    
+    cursor_reach(keyword = "Table 1. Subject count breakdown before QC") %>%
+    body_add_flextable(value = ft_1) %>%
+    
+    cursor_reach(keyword = "Figure 1. subject level duplication rate by number of lanes") %>%
+    slip_in_img(src = "''' + input.subject_dup_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "residual duplication rate after lane dup removed.") %>%
+    body_add_flextable(value = ft_2) %>%
+    cursor_reach(keyword = "Figure 2. sorted contamination rate by subjects") %>%
+    slip_in_img(src = "''' + input.contamination_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Table 3.  10 samples with highest contamination rate") %>%
+    body_add_flextable(value = ft_3) %>%
+
+    cursor_reach(keyword = "Figure 3. coverage scatter plot for all exome samples, with cases and controls separated") %>%
+    slip_in_img(src = "''' + input.aveCov_plot + '''", width = 5, height = 5, pos = "before") %>%
+    '''
+        if not config['MODE'] == 'wgs':           
+            rTxt += '''           
+    cursor_reach(keyword = "Table 4a. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for US score") %>%
+    body_add_flextable(value = ft_4a) %>%	
+    cursor_reach(keyword = "Table 4b. Min, 1st quantile, Median, Mean, 3rd quantile and Max score for CCS score") %>%
+    body_add_flextable(value = ft_4b) %>%
+        
+    cursor_reach(keyword = "Figure 4. the histogram of UE score and CCS Score for all sample") %>%
+    slip_in_img(src = "''' + input.ccs_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
+    slip_in_img(src = "''' + input.ue_plot + '''", width = 2.5, height = 2.5, pos = "before") %>%
+    cursor_reach(keyword = "Table 5.  10 regions with highest Unevenness Score") %>%
+    body_add_flextable(value = ft_5) %>%
+    
+    cursor_reach(keyword = "Figure 5a. histogram for all Fold 80 base penalty for samples") %>%
+    slip_in_img(src = "''' + input.fold80_plot + '''", width = 5, height = 5, pos = "before") %>%   
+    cursor_reach(keyword = "Figure 5b. boxplot for median and mean insert sizes") %>%
+    slip_in_img(src = "''' + input.insertSize_plot + '''", width = 5, height = 5, pos = "before") %>% '''
+        else:    
+            rTxt += '''     
+    cursor_reach(keyword = "Figure 5. boxplot for median and mean insert sizes") %>%
+    slip_in_img(src = "''' + input.insertSize_plot + '''", width = 5, height = 5, pos = "before") %>% '''
+    
+        rTxt += '''
+              
+    cursor_reach(keyword = "Figure 6. boxplot of average oxidation q score and lowest oxidation q score") %>%
+    slip_in_img(src = "''' + input.oxidation_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 7. boxplot of Lowest Preadapter and Baitbias Total Score for all samples") %>%
+    slip_in_img(src = "''' + input.seqArtifact_plot + '''", width = 5, height = 5, pos = "before") %>%
+
+    cursor_reach(keyword = "Figure 8. ChrY/ChrX reads ratio for all subjects") %>%
+    slip_in_img(src = "''' + input.sex_plot + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 9. Laser ancestry estimation for all subjects") %>%
+    slip_in_img(src = "''' + input.ancestry_plot + '''", width = 5, height = 5, pos = "before") %>%
+    ''' 
+        if config['MODE'] == 'somatic':
+            rTxt += '''         
+    cursor_reach(keyword = "Figure 10a. VAF distribution across all base changes") %>%
+    slip_in_img(src = "''' + input.basechange_distribution + '''", width = 5, height = 5, pos = "before") %>%   
+    cursor_reach(keyword = "Figure 10b. base change counts per disease group") %>%
+    slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") %>%    
+    cursor_reach(keyword = "Figure 11. scatter plot of testing site count against concordant rate") %>%
+    slip_in_img(src = "''' + input.bam_matcher_plot + '''", width = 5, height = 5, pos = "before") '''
+        elif config['MODE'] == 'tumor_only':
+            rTxt += '''         
+    cursor_reach(keyword = "Figure 10a. VAF distribution across all base changes") %>%
+    slip_in_img(src = "''' + input.basechange_distribution + '''", width = 5, height = 5, pos = "before") %>%   
+    cursor_reach(keyword = "Figure 10b. base change counts per disease group") %>%
+    slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") '''
+        else:    
+            rTxt += '''     
+    body_replace_all_text("GROUP_BASECHANGE", "''' + str(groupBasechangeDir) + '''", fixed=TRUE) %>%
+    body_replace_all_text("RELATEDNESS_REPORT", "''' + str(relatednessReport) + '''", fixed=TRUE) %>%
+    
+    cursor_reach(keyword = "Figure 10a. Ensemble filtered variant count by sample") %>%
+    slip_in_img(src = "''' + input.total_count + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Table 6a. 10 samples with lowest variant count ") %>%
+    body_add_flextable(value = ft_6a) %>%	
+    cursor_reach(keyword = "Table 6b. 10 samples with lowest ti/tv ratio") %>%
+    body_add_flextable(value = ft_6b) %>%
+    cursor_reach(keyword = "Figure 10b. Ensemble filtered variant ti/tv ratio by sample") %>%
+    slip_in_img(src = "''' + input.titv_ratio + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 10c. base change counts per disease group") %>%
+    slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 10d. missing call rate per disease group") %>%
+    slip_in_img(src = "''' + input.missingRate_hist + '''", width = 5, height = 5, pos = "before") %>%
+    cursor_reach(keyword = "Figure 11. off-diagonal pairwise sample relatedness kinship coefficient") %>%
+    slip_in_img(src = "''' + input.relatedness_hist + '''", width = 5, height = 5, pos = "before") %>%'''
+    
+        rTxt += '''
+print(my_doc, target = "''' + output.doc + '''")
+'''
+        with open(output.R, 'w')  as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+    
+
+#    slip_in_img(src = "''' + input.mosdepth_plot + '''", width = 6, height = 6, pos = "before") %>%

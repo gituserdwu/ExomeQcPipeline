@@ -1,0 +1,111 @@
+#!/usr/bin/python
+#need module load gcc zlib to run qqplot
+
+rule exomeCQA_bedCov:
+    input:
+        bam = getBam,
+        bed = config['exomeCQA_bed']
+    output:
+        exomeCQA_dir + '/bedcov/{sample}_coverage.txt'
+    threads:
+       5 
+    shell:
+        'module load bedtools;'
+        'coverageBed -a {input.bed} -b {input.bam} -d > {output}'
+
+rule exomeCQA_genInd:
+    input: 
+        exomeCQA_dir + '/bedcov/{sample}_coverage.txt'
+    output:
+        exomeCQA_dir + '/bedcov/{sample}_coverage.txt.idx'
+    threads:
+        2
+    shell:
+        '/DCEG/CGF/Bioinformatics/Production/software/ExomeCQA/genIndex {input} > {output}'
+		
+rule exomeCQA:
+    input:
+        expand(exomeCQA_dir + '/bedcov/{sample}_coverage.txt.idx', sample = SAMPLES)
+    params:
+        exomeCQA_dir + '/bedcov'
+    output:
+        exon = exomeCQA_dir + '/exomeCQA_exon.chrALL',
+        gene = exomeCQA_dir + '/exomeCQA_gene.chrALL'
+    threads:
+        20
+    shell:
+        '/DCEG/CGF/Bioinformatics/Production/software/ExomeCQA/ExomeCQA {params} {output.exon} {output.gene}'
+		
+rule exomeCQA_exon_score:
+    input:
+        exon_input = exomeCQA_dir + '/exomeCQA_exon.chrALL',
+        gene_input = exomeCQA_dir + '/exomeCQA_gene.chrALL'
+    output:
+        exon_output = exomeCQA_dir + '/exomeCQA_exon.txt',
+#        gene_output = exomeCQA_dir + '/exomeCQA_gene.txt'
+#    params:
+        ue_output = exomeCQA_dir + '/gene_UE.chrALL'
+    shell:
+#        '. /etc/profile.d/modules.sh; module load python/2.7.5 glu;'
+        '''awk -F"\t" 'BEGIN{{print "Chr\tStart\tEnd\tGene\tCCS\tUE"}} {{print $1"\t"$2"\t"$3"\t"$4"\t"$9"\t"$16}}' {input.exon_input} > {output.exon_output}; '''
+        '''sort -k1,4 {input.exon_input} | awk '{{arr[$1"\t"$4]+= $16; count[$1"\t"$4] += 1}}END{{for (a in arr) {{print a"\t" arr[a] / count[a]}} }}' > {output.ue_output};'''
+#        'glu util.join  -1 1,2 -2 1,2 -j inner {input.gene_input} {params} -o {output.gene_output}'
+					
+rule exomeCQA_plot:
+    input:
+        gene_input = exomeCQA_dir + '/exomeCQA_gene.chrALL',
+        #exon_output = exomeCQA_dir + '/exomeCQA_exon.txt',
+        ue_output = exomeCQA_dir + '/gene_UE.chrALL'
+    params:
+        exomeCQA_dir + '/exomeCQA_gene.txt'
+    output:
+        summary_ccs = exomeCQA_dir + '/summary_ccs.txt',
+        summary_ue = exomeCQA_dir + '/summary_ue.txt',
+        outlier_ue = exomeCQA_dir + '/top10_ue.txt',
+        png_ue = exomeCQA_dir + '/unevenness.png',
+        png_css = exomeCQA_dir + '/cohort_coverage_sparseness.png',
+        R = exomeCQA_dir + '/exomeCQA_plot.R',
+        Rout = exomeCQA_dir + '/exomeCQA_plot.R.out'
+    run:
+        rTxt = '''
+        library(ggplot2)
+        library(dplyr)
+        data1 <- read.table("''' + str(input.gene_input) + '''", header = FALSE, sep = "\t")
+        data2 <- read.table("''' + str(input.ue_output) + '''", header = FALSE, sep = "\t")
+        colnames(data1) = c("Chr","Gene","CCS")
+        colnames(data2) = c("Chr","Gene","UE")
+        data_exomeCQA = inner_join(data1, data2, by=c("Chr"="Chr", "Gene"="Gene"))
+        data_exomeCQA2 <- subset(data_exomeCQA, data_exomeCQA$UE >= 1)
+        
+        sink("''' + str(params) + '''")
+        print(data_exomeCQA)
+        sink()
+        sink("''' + str(output.summary_ccs) + '''")
+        print(head(summary(data_exomeCQA$CCS),6))
+        sink() 
+        sink("''' + str(output.summary_ue) + '''")
+        print(head(summary(data_exomeCQA2[,4]),6))
+        sink() 
+        sink("''' + str(output.outlier_ue) + '''")
+        print(head(data_exomeCQA[order(-data_exomeCQA$UE),][,c(1:2,4)],10))
+        sink()         
+        png("''' + str(output.png_css) + '''", 6.5, 6.5, "in", res = 300)
+        ggplot(data_exomeCQA, aes(CCS)) + geom_histogram() +
+        scale_y_continuous(trans="log2") +
+        labs(x = "Cohort Coverage Sparseness score", y = "gene counts(log2 transformed)") +
+        theme_bw()
+        dev.off()
+        png("''' + str(output.png_ue) + '''", 6.5, 6.5, "in", res = 300)
+        ggplot(data_exomeCQA, aes(UE)) + geom_histogram() +
+        scale_y_continuous(trans="log2") +
+        labs(x = "UE score", y = "gene counts(log2 transformed)") +
+        theme_bw()
+        dev.off()
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+
+#awk 'BEGIN{print "gene\tUEscore"}{arr[$4]+=$16;count[$4]+=1}END{for (a in arr) {print a"\t"arr[a] / count[a]}}' /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/exomeCQA_WES_V3/exon.chrALL  > /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/exomeCQA_WES_V3/gene_UE.chrALL
+#echo -e "chr\tgene\tCCSscore" | cat - /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/exomeCQA_WES_V3/gene.chrALL > /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/exomeCQA_WES_V3/gene_CCS.chrALL
+#glu util.join -1 gene -2 gene -j inner /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/exomeCQA_WES_V3/gene_CCS.chrALL /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/exomeCQA_WES_V3/gene_UE.chrALL -o /CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/exomeCQA_WES_V3/gene_score.chrALL

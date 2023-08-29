@@ -1,0 +1,65 @@
+#!/usr/bin/python
+#import glob
+import sys
+import os
+from glob import glob
+      
+rule run_verifyBamID:
+    input:
+        getBam
+    output:
+        out1 = project + '/subject_level_BAM_contamination/results/tmp_working/{sample}.selfSM',
+        match = project + '/subject_level_BAM_contamination/results/tmp_working/{sample}.bestSM'
+    params:
+        outDir = project + '/subject_level_BAM_contamination/results/tmp_working/{sample}',
+        omnivcf = config['omniVcf']
+    shell:
+        #'/DCEG/CGF/Bioinformatics/Production/BZhu/bin/verifyBamID_1.1.0/verifyBamID/bin/verifyBamID --ignoreRG --chip-none --precise --vcf /DCEG/CGF/Bioinformatics/Production/BZhu/verifyBamID/Omni25_genotypes_1525_samples_v2.b37.PASS.ALL.sites_with_chr.vcf --bam {input} --out {params}'     
+        '/DCEG/CGF/Bioinformatics/Production/BZhu/bin/verifyBamID_1.1.0/verifyBamID/bin/verifyBamID --ignoreRG --chip-none --precise --best --vcf {params.omnivcf} --bam {input} --out {params.outDir}'     
+        
+rule sum_verifyBamID:
+    input:
+        expand(project + '/subject_level_BAM_contamination/results/tmp_working/{sample}.selfSM', sample = SAMPLES)
+    output:
+        project + '/subject_level_BAM_contamination/results/bam_location.txt.all.output'
+    run:
+        with open(output[0], 'w') as out:
+            with open(input[0]) as file1:
+                out.write( 'Analysis_ID\tContamination_rate' + '\n' )
+                lines=file1.readlines()
+                RATE=lines[1].split('\t')[6].rstrip()
+                SAMP=lines[1].split('\t')[0].rstrip()
+                out.write( SAMP + '\t' + RATE + '\n' )             
+            for f in input[1:]:
+                with open(f) as file2:
+                    lines=file2.readlines()
+                    RATE=lines[1].split('\t')[6].rstrip()
+                    SAMP=lines[1].split('\t')[0].rstrip()
+                    out.write( SAMP + '\t' + RATE + '\n' )
+                
+rule contamination_plot:
+    input:
+        project + '/subject_level_BAM_contamination/results/bam_location.txt.all.output'
+    output:
+        png_contamination = contamination_dir + '/bam_contamination_rate.png',
+        outlier_cont = contamination_dir + '/top10_contamination_rate.txt',
+        R = contamination_dir + '/bam_contamination_rate.R',
+        Rout = contamination_dir + '/bam_contamination_rate.R.out'
+    run:
+        rTxt = '''
+        data_contamination <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_contamination) + '''")
+        sortData <- data_contamination[with(data_contamination, order(data_contamination$Contamination_rate)), ]
+        plot(sortData$Contamination_rate, xlab="Samples", ylab="Bam Contamination Rate(%)", pch=20, cex = 0.4, yaxt="n")
+        axis(2, at=pretty(sortData$Contamination_rate), lab=paste0(pretty(sortData$Contamination_rate) * 100, " %"), las=TRUE)
+        title(main= "Bam Contamination Rate",sub= "", cex=0.6)
+        abline(h=0.05,col="orange")
+        dev.off()
+        sortRevData <- sortData[with(sortData, order(-sortData$Contamination_rate)), ]
+        sink("''' + str(output.outlier_cont) + '''")
+        print(head(sortRevData,10))        
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+

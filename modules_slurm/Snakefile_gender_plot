@@ -1,0 +1,95 @@
+#!/usr/bin/python
+#import glob
+import sys
+import os
+from glob import glob
+
+# rule all:
+   # input:
+       # gender_check_dir + '/gender_check.png'
+       
+# gender_check_dir = 'gender_check'    
+# SAMPLES=[]
+
+# for bam in glob.iglob(bam_location + '/*/*.bam', recursive=True):
+    # samp = os.path.basename(bam)[:-4]
+    # SAMPLES.append(os.path.basename(bam)[:-4])
+
+rule XYratio_single:
+    input:
+        getBam
+    output:
+        project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt' 
+    shell:
+        'module load samtools;'
+        'Xcount=$(samtools view -c {input} chrX );'
+        'Ycount=$(samtools view -c {input} chrY );'
+        'echo -e "{wildcards.sample}\t${{Xcount}}\t${{Ycount}}" > {output}'
+   
+rule XYratio_table:
+    input:
+        single = expand(project + '/gender_concordance_check/intermediate_files/counts/{sample}_X_Y_COUNTS.txt', sample = SAMPLES),
+        Manifest = manifest
+    output:
+        gender_check_dir + '/XYratio_table.txt'
+    params:
+#        Manifest = getManifest, get error message of 'generator' object is not subscriptable, when use this function at params.
+        merged_table = gender_check_dir + '/XYratio_merged.txt'
+    run:
+        with open(params.merged_table, 'w') as mergedfile:
+            for fname in input.single:
+                with open(fname) as infile:
+                    for line in infile:
+                        mergedfile.write(line)
+        mergedfile.close()
+        genderDic = {}
+#        with open(params.Manifest[0], 'r') as manifest: get errors of read just the first letter of the path, turn out only input is list, params is suppose to be string and don't need to add [0]
+        with open(input.Manifest, 'r') as manifest:
+            next(manifest)
+            for line in manifest:
+               key = line.split(',')[6] + '_' + line.split(',')[12]
+               genderDic[key] = line.split(',')[9]
+        with open(params.merged_table, 'r') as infile, open(output[0], 'w') as outfile:
+            outfile.write( 'SAMPLE\tChrX\tChrY\tIDENTIFILER_GENDER\tYXratio' + '\n' )
+            for line in infile:
+                ratio = float(line.split('\t')[2])/float(line.split('\t')[1])
+                value = genderDic.get(line.split('\t')[0].strip())
+                if value is not None:
+                    outfile.write(line.strip() + '\t' + value.replace("F","Female").replace("M","Male").replace("N","Unknown") + '\t' + str(ratio) + '\n')
+
+rule gender_plot:
+    input:
+        gender_check_dir + '/XYratio_table.txt'
+    output:
+        png_gender = gender_check_dir + '/gender_check.png',
+        outlier_table = gender_check_dir + '/gender_outlier.txt',
+        R = gender_check_dir + '/gender_check.R',
+        Rout = gender_check_dir + '/gender_check.R.out'
+    run:
+        rTxt = '''
+        library(ggplot2)
+        library(dplyr)
+        data_gender <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_gender) + '''", 6.5, 6.5, "in", res = 300)
+        colors <- c("Male"=rgb(0, 0, 1, .3), "Unknown"=rgb(1, 0, 0, .3), "Female"=rgb(0, 1, 0, .3),"Other"=rgb(.75, .75, .75, .3) )
+        sortData <- arrange(data_gender, IDENTIFILER_GENDER, YXratio)
+        maledata <- subset(sortData, IDENTIFILER_GENDER=="Male", select=YXratio)
+        femaledata <- subset(sortData, IDENTIFILER_GENDER=="Female", select=YXratio)
+
+        gg <- ggplot(sortData, aes(x=factor(SAMPLE, levels=unique(SAMPLE)), y=YXratio)) 
+        gg + geom_point(aes(color=as.factor(IDENTIFILER_GENDER))) + 
+        scale_color_manual(name="Sex",values=colors) + 
+        labs(x = "subjects", y = "ChrY/ChrX Reads Ratio") +
+        theme(legend.position=c(0.1, 0.9),axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+        theme(axis.line = element_line(size = 1, colour = "grey"),panel.background = element_rect(fill = "white")) +
+        geom_hline(yintercept = colMeans(femaledata)+sd(femaledata$YXratio), color=rgb(0, 1, 0, .3)) +
+        geom_hline(yintercept = colMeans(maledata)-sd(maledata$YXratio),color=rgb(0, 0, 1, .3))
+        outlier <- subset(sortData, IDENTIFILER_GENDER==3&YXratio<=colMeans(femaledata)+sd(femaledata$YXratio)|IDENTIFILER_GENDER==1&YXratio>=colMeans(maledata)-sd(maledata$YXratio))
+        sink("''' + str(output.outlier_table) + '''")
+        print(outlier[,c(1,4,5)])
+        sink()      
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+        

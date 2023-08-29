@@ -1,0 +1,31 @@
+#!/usr/bin/python
+import sys
+import os
+
+if config['MODE'] == 'somatic' or config['MODE'] == 'tumor_only':
+    rule run_filter_somatic:
+        input:
+            ensemble_dir + '/{sample}_WES_PON_passed.vcf'
+        output:
+            postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf'
+        params:
+            bed = bedFile,
+            prefix = postcalling_qc_dir + '/{sample}_intersection_region_passed.vcf.gz'
+        shell:
+            'module load bcftools tabix;'
+            'bgzip -c {input} > {params.prefix} && tabix -p vcf {params.prefix};'
+            'bcftools view -f "PASS" --regions-file {params.bed} {params.prefix} > {output}'           
+
+else:
+    rule run_filter:
+        input:
+            ensemble_vcf
+        output:
+            vcf = postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf.gz',
+            index = postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf.gz.tbi'
+        params:    
+            bed = '--regions-file ' + bedFile if (config['MODE'] == 'wes') else []
+        shell:
+            '. /etc/profile.d/modules.sh; module load bcftools tabix;'
+            #'''cat {input} | java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar filter "( ( FILTER =~ '2') | ( FILTER =~ '3') )" | java -Xmx16g -jar /DCEG/CGF/Bioinformatics/Analysis/public_v2/snpEff/SnpSift.jar intervals {params.bed} > {params.vcf};'''
+            'bcftools view {params.bed} -f threeCallers,twoCallers -Oz -o {output.vcf} {input}; tabix -p vcf {output.vcf}'

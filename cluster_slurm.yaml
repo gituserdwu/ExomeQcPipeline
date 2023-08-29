@@ -1,0 +1,48 @@
+# cluster.yaml - cluster configuration
+__default__:
+    account: luow2
+    partition: defq
+    time: 48:00:00 # time limit for each job
+    ntasks-per-node: 2 #Request n cores be allocated per node.
+
+pileup2seq:
+    account: luow2
+    partition: bigmemq
+    time: 48:00:00 # time limit for each job
+    ntasks-per-node: 2
+    output: pileup2seq-%j.out
+    error: pileup2seq-%j.err
+
+run_basechange:
+    account: luow2
+    partition: bigmemq
+    time: 48:00:00 # time limit for each job
+    ntasks-per-node: 2
+    output: run_basechange-%j.out
+    error: run_basechange-%j.err
+
+exomeCQA_bedCov:
+    account: luow2
+    partition: bigmemq
+    time: 48:00:00 # time limit for each job
+    ntasks-per-node: 2
+    output: exomeCQA_bedCov-%j.out
+    error: exomeCQA_bedCov-%j.err
+
+exomeCQA:
+    account: luow2
+    partition: bigmemq
+    time: 48:00:00 # time limit for each job
+    ntasks-per-node: 2
+    output: exomeCQA-%j.out
+    error: exomeCQA-%j.err
+
+fastNGSadmixPCA:
+    account: luow2
+    partition: bigmemq
+    time: 48:00:00 # time limit for each job
+    ntasks-per-node: 2
+    output: fastNGSadmixPCA-%j.out
+    error: fastNGSadmixPCA-%j.err
+
+

@@ -1,0 +1,91 @@
+#!/usr/bin/python
+import glob
+import sys
+import os
+from glob import glob
+
+project = config['project']
+bamDir = project + '/../bam_location/*'
+ancestry_check_dir = 'laser'
+hgdpDir = 'modules/HGDP'
+refFile = config['ref']
+populationFile = config['population_file']
+
+SAMPLES=[]
+bamDict = {}
+
+for bam in glob(bamDir + '/*.bam', recursive=True):
+    sample = os.path.basename(bam)[:-4]
+    SAMPLES.append(os.path.basename(bam)[:-4])
+    bamDict[sample] = (bam)
+    
+def get_bam(wildcards):
+    (bam) = bamDict[wildcards.sample]
+    return bam
+
+rule all:
+    input:
+        ancestry_check_dir + '/Results_on_HGDP938.png'
+
+rule mpileup:
+    input:
+        bam = get_bam,
+        bed = hgdpDir + '/HGDP_938_hg19.bed',
+        reference = refFile
+    output:
+        ancestry_check_dir + '/mpileup/{sample}_hgdp.mpileup'
+    shell:
+        '. /etc/profile.d/modules.sh; module load samtools;'
+        'samtools mpileup -q 30 -Q 20 -f {input.reference} -l {input.bed} {input.bam} > {output}'
+
+rule pileup2seq:
+    input:
+        expand(ancestry_check_dir + '/mpileup/{sample}_hgdp.mpileup',sample = SAMPLES)
+    output:
+        ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq'
+    params:
+        captureKit = config['capturekit'],
+        out_prefix = ancestry_check_dir + '/pileup2seq_output_HGDP_938',
+        reference = refFile,
+        site = hgdpDir + '/HGDP_938.site',
+        id = '-i ' + populationFile if config['population_file'] != 'NA' else []
+    threads:
+        8
+    run:
+        '. /etc/profile.d/modules.sh; module load python/2.7.8;'
+        'python /DCEG/Resources/Tools/laser/LASER-2.04/pileup2seq/pileup2seq -f {params.reference} -m {params.site} {params.id} -b {params.captureKit} -o {params.out_prefix} {input}'
+
+rule laser_coord:
+    input:
+        ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq'
+    output:
+        ancestry_check_dir + '/HGDP_938.RefPC.coord'
+    params:
+        hgdpDir + '/example_coord.conf'
+    shell:
+        '. /etc/profile.d/modules.sh; module load laser;'
+        'laser -p {params} -s {input} -pca 1'
+
+rule laser_final:
+    input:
+        seq = ancestry_check_dir + '/pileup2seq_output_HGDP_938.seq',
+        coord = ancestry_check_dir + '/HGDP_938.RefPC.coord'
+    output:
+        ancestry_check_dir + '/HGDP_938.SeqPC.coord'
+    params:
+        hgdpDir + '/example_final.conf'
+    shell:
+        '. /etc/profile.d/modules.sh; module load laser;'
+        'laser -p {params} -s {input.seq} -c {input.coord}'
+
+rule laser_plot:
+    input:
+        ref = ancestry_check_dir + '/HGDP_938.RefPC.coord',
+        data = ancestry_check_dir + '/HGDP_938.SeqPC.coord'
+    output:
+        ancestry_check_dir + '/procrustesPCASamples.png'
+    shell:
+        '. /etc/profile.d/modules.sh; module load R;'
+        'cd modules/HGDP/; Rscript --vanilla plotHGDP_snakemake.r ../../{input.data} ../../{input.ref} ../../{output}'
+
+

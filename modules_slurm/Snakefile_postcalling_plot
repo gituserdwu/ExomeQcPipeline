@@ -1,0 +1,195 @@
+#!/usr/bin/python
+#import glob
+import sys
+import os
+from glob import glob
+import pandas as pd
+
+
+#rule all:
+#    input:
+#        total_count = postcalling_qc_dir + '/variant_count.png',
+#        titv_ratio = postcalling_qc_dir + '/titv_ratio.png',
+#        #lowqual_basechange = postcalling_qc_dir + '/lowqual_basechange.png',
+#        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS), 
+#        basechange_all = postcalling_qc_dir + '/basechange_all.png',
+
+rule run_basechange:
+    input:
+        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf.gz'
+    output:
+        postcalling_qc_dir + '/variants_annotated_basechange.txt'
+    shell:
+        '. /etc/profile.d/modules.sh; module load bcftools;'
+        'bcftools view {input} | perl ./modules/vcfFilter_count_base_change.pl - {output}'
+
+
+#switch from glu util.table to P dplyr
+rule postcalling_qc_table:
+    input:
+        postcalling_qc_dir + '/variants_annotated_basechange.txt'
+    output:
+        variant = postcalling_qc_dir + '/titv.txt',
+        basechange = postcalling_qc_dir + '/basechange_all.txt' 
+    params:
+        outdir = postcalling_qc_dir,
+        cov_report = coverage_dir + '/Final_merged_coverage.txt',
+#        tmp = postcalling_qc_dir + '/titv_tmp.txt'
+    shell:
+#        '. /etc/profile.d/modules.sh; module load python/2.7.5 glu;'
+        'sh ./modules/post_calling_table.sh {input} {params.outdir};'
+#        'glu util.join -1 SAMPLE -2 ANALYSISID -j inner {output.variant} {params.cov_report} -o {params.tmp}:c=SAMPLE,TOTAL,TI,TV,RATIO,CACO,COV; mv {params.tmp} {output.variant}'
+
+
+
+rule variant_count_plot:
+    input:
+        variant = postcalling_qc_dir + '/titv.txt',
+        bed = bedFile 
+    params:
+        cov_report = coverage_dir + '/Final_merged_coverage.txt',
+    output:
+        variant = postcalling_qc_dir + '/Final_titv.txt',
+        total_count = postcalling_qc_dir + '/variant_count.png',
+        perKB_count = postcalling_qc_dir + '/variant_count_perKB.png',
+        total_outlier = postcalling_qc_dir + '/variant_outlier10.txt',
+        titv_ratio = postcalling_qc_dir + '/titv_ratio.png',
+        titv_outlier = postcalling_qc_dir + '/titv_outlier10.txt',
+        R = postcalling_qc_dir + '/variant_count.R',
+        Rout = postcalling_qc_dir + '/variant_count.R.out'
+    run:
+        df = pd.read_csv(input[1], sep="\t", header=None, names=["chr", "start", "end"])
+        df["len"] = df["end"] - df["start"]
+        totalBP = sum(df["len"])      
+        rTxt = '''
+        library(dplyr)
+        data1 <- read.table("''' + str(input[0]) + '''", header = TRUE, sep = "\t" )
+        data2 <- read.table("''' + str(params[0]) + '''", header = TRUE, sep = "\t" )
+        data = inner_join(data1, data2, by=c("SAMPLE"="ANALYSISID")) %>% select('SAMPLE':'COV')
+        
+        colors <- c(rgb(0, 0, 1, .3), rgb(1, 0, 0, .3), rgb(.75, .75, .75, .3), rgb(0, 1, 0, .3))
+        png("''' + str(output.total_count) + '''")
+        plot(data$TOTAL, xlab="Samples", ylab="Total Variant Count", pch=20, col= colors[data$CACO])
+        title(main= "Total Variant Count for all Samples",sub= "", cex=0.6)
+        legend("topright", legend = c("Cases", "Controls"), col = c("blue", "red"), pch = 19, cex=0.7, bty="n")
+        dev.off()
+        png("''' + str(output.perKB_count) + '''")
+        plot(data$TOTAL*1000/''' + str(totalBP) + ''', xlab="Samples", ylab="Variant Count per Kb", pch=20, col= colors[data$CACO])
+        title(main= "Variant Count per kb across Sample",sub= "", cex=0.6)
+        legend("topright", legend = c("Cases", "Controls"), col = c("blue", "red"), pch = 19, cex=0.7, bty="n")
+        dev.off()
+        png("''' + str(output.titv_ratio) + '''")
+        plot(data$RATIO, xlab="Samples", ylab="Ti/TV Ratio", pch=20,col= colors[data$CACO], ylim=c(1.0, 3.0))
+        ave_ratio=mean(data$RATIO)
+        sd_ratio=sd(data$RATIO)*3
+        abline(h=ave_ratio)
+        abline(h=ave_ratio+sd_ratio,col="blue")
+        abline(h=ave_ratio-sd_ratio,col="blue")
+        legend("topright", legend = c("Cases", "Controls"), col = c("blue", "red"), pch = 19, cex=0.7, bty="n")
+        dev.off()
+        sink("''' + str(output.variant) + '''")
+        print(data)
+        sink()
+        sink("''' + str(output.total_outlier) + '''")
+        print(head(data[order(data$TOTAL),][,c(1:2,5,7)],10))
+        sink()  
+        sink("''' + str(output.titv_outlier) + '''")
+        print(head(data[order(data$RATIO),][,c(1,3:5)],10))
+        sink()  
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+
+rule lowqual_basechange_plot:
+    input:
+        variant = postcalling_qc_dir + '/low_qual_basechange.txt'
+    output:
+        lowqual_basechange = postcalling_qc_dir + '/lowqual_basechange.png',
+        R = postcalling_qc_dir + '/lowqual_basechange.R',
+        Rout = postcalling_qc_dir + '/lowqual_basechange.R.out'
+    run:
+        rTxt = '''
+        data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t" )
+        png("''' + str(output.lowqual_basechange) + '''")
+        matplot(data,pch=20, xlab= "Sample", ylab= "number of low qual variant", col = c(2:ncol(data)),cex = 0.4)
+        legend("topleft", legend = colnames(data[,2:ncol(data)]),col = c(2:ncol(data)), pch=20)
+        dev.off()
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+
+#not working with gcc/4.8.4
+rule basechange_group_plot:
+    input:
+        postcalling_qc_dir + '/basechange_all.txt'
+    output:
+        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS),
+        basechange_all = postcalling_qc_dir + '/basechange_all.png',        
+        R = postcalling_qc_dir + '/basechange.R',
+        Rout = postcalling_qc_dir + '/basechange.R.out'
+    params:
+        postcalling_qc_dir + '/basechange_'
+    run:
+        rTxt = '''
+        library(ggplot2)
+        library(plyr)
+        library(reshape2)
+        library(viridisLite)
+        library(viridis)
+        data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t", row.names=NULL )	
+        png("''' + str(output.basechange_all) + '''")
+        meltdata = melt(data = data, id.vars = c("GROUP","BASE"),measure.vars = c("X0.90", "X90.400", "X400.2400", "X2400.6000", "X6000.12000", "X12000.20000", "X20000.36000", "X36000.60000", "X60000.100000", "X100000.1600000", "X.1600000"))
+        gg <- ggplot(meltdata, aes(x=factor(variable, levels=unique(variable)), y=value,color=BASE))
+        gg + geom_point(size = 0.5) +
+        labs(x = "Quality Intervals", y = "Variant Count") +
+        theme(axis.text.x=element_text(size=4,angle=45))+
+        facet_wrap(GROUP~.)
+        dev.off()
+        for (val in unique(meltdata$GROUP))
+        {
+            data=meltdata[which(meltdata$GROUP==val), ] 
+            filename=paste("''' + str(params) + '''", val, '.png',sep='')
+            title=paste(val,'Base Change') 
+            gg <- ggplot(data, aes(x=factor(variable, levels=unique(variable)), y=value,color=BASE, group = BASE)) +
+            geom_point(size = 0.5) +geom_line() +
+            labs(x = "Quality Intervals", y = "Variant Count") +
+            theme(axis.text.x=element_text(angle=45))+ 
+            ggtitle(title)+
+            theme(plot.title = element_text(hjust = 0.5))
+            ggsave(filename,plot=gg)
+        }
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')	
+
+rule run_bcftoolsGT:
+    input:
+        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf.gz'
+    output:
+        rateByChr = postcalling_qc_dir + '/callRate_bychr.txt',
+        gt = postcalling_qc_dir + '/GT.txt'
+    shell:
+        '''
+        . /etc/profile.d/modules.sh; module load bcftools;
+        bcftools query -f "%CHROM[\\t%GT]\\n" {input} | awk -F"\\t" '{{ count=0;for ( i=2; i<=NF; i++ ) {{ if($i=="./."){{count++}} }}; print $1"\\t"count/(NF-1) }}' > {output.rateByChr};
+        bcftools query -H -f "%CHROM\\t%POS[\\t%GT]\\n" {input} | sed "s/:GT//g"|  sed -r "s/\[[^][]*\]//g" | sed "s/# //g" > {output.gt};          
+        '''        
+        
+rule call_rate_plot:
+    input:        
+        rateByChr = postcalling_qc_dir + '/callRate_bychr.txt',
+        gt = postcalling_qc_dir + '/GT.txt'
+    output:
+        plotByChr = postcalling_qc_dir + '/callRate_bychr.jpeg',
+        table = postcalling_qc_dir + '/callRate_bychr.quantile.txt',
+        plotByGroup = postcalling_qc_dir + '/callRate_byGroup.jpeg'       
+    params:
+        script = 'modules/callRate.R'    
+    shell:   
+        '''
+        . /etc/profile.d/modules.sh; module load R;
+        Rscript {params.script}
+        '''        

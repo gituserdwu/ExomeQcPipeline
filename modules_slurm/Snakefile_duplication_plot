@@ -1,0 +1,79 @@
+#!/usr/bin/python
+#import glob
+import sys
+import os
+
+project = config['project']
+manifest = config['manifest']
+
+
+# def getReport(wildcards):
+    # return glob.iglob(project + '/../Manifest/*.csv', recursive=False)
+	
+# rule all:
+   # input:
+       # png_lane_dup_rate = deduplication_dir + '/lane_dup_rate.png',
+       # outlier_dup = deduplication_dir + '/top10_dup_rate.txt',
+       # png_subject_dup_rate = deduplication_dir + '/subject_dup_rate.png'
+
+rule deduplication_table:
+    input:
+        manifest
+    output:
+        merged_dup_rate = deduplication_dir + '/merged_dup_rate.txt',
+        subject_dup_rate = deduplication_dir + '/subject_dup_rate.txt'
+    params:
+        deduplication_dir
+    shell:
+        'sh ./modules_slurm/dedup_rate.sh {input} {params}'
+
+rule deduplication_plot:
+    input:
+        merged_dup_rate = deduplication_dir + '/merged_dup_rate.txt',
+        subject_dup_rate = deduplication_dir + '/subject_dup_rate.txt'
+    output:
+        png_lane_dup_rate = deduplication_dir + '/lane_dup_rate.png',
+        png_subject_dup_rate = deduplication_dir + '/subject_dup_rate.png',
+        outlier_dup = deduplication_dir + '/top10_dup_rate.txt',        
+        R = deduplication_dir + '/deduplication_rate.R',
+        Rout = deduplication_dir + '/deduplication_rate.R.out'
+    run:
+        rTxt = '''
+        library(ggplot2)
+        library(plyr)
+        require(reshape2)
+        library(reshape2)
+        no_col <- (max(count.fields("''' + str(input.merged_dup_rate) + '''", sep = "\t")) -4)
+        data_deduplication_lane <- read.table("''' + str(input.merged_dup_rate) + '''", header = FALSE, fill=TRUE, sep = "\t",col.names=c("SUBJECT","NUM_OF_LANE","TOTAL_DUP_RATE", "SECONDARY", 1:no_col) )
+        png("''' + str(output.png_lane_dup_rate) + '''")
+        df <- melt(data_deduplication_lane[,c(1,4:no_col,no_col+1,no_col+2,no_col+3,no_col+4)], id.vars = 'SUBJECT', variable.name = 'lane_num')
+        ggplot(df, aes(SUBJECT,value)) + 
+        geom_point() + 
+        facet_grid(lane_num ~ .) +
+        theme(axis.ticks.x=element_blank(),axis.text.x=element_blank())
+        dev.off()
+        stat_box_data <- function(y) {
+          return( 
+            data.frame(
+              y = max(y) * 1.1,
+              label = length(y)
+            )
+          )
+        }
+        data_deduplication_sub <- read.table("''' + str(input.subject_dup_rate) + '''", header = FALSE, sep = "\t" )
+        names(data_deduplication_sub) <- c("SAMPLE","LANE_NUM","TOTAL_DUP","SECONDARY_DUP")
+        max_lane=max(data_deduplication_sub$LANE_NUM)
+        png("''' + str(output.png_subject_dup_rate) + '''")
+        ggplot(data_deduplication_sub,aes(LANE_NUM,TOTAL_DUP,color=factor(LANE_NUM))) + 
+        geom_violin(draw_quantiles = c(0.25, 0.5, 0.75),adjust = 1,scale = "width") + 
+        stat_summary(fun.data = stat_box_data,geom = "text",aes(group=data_deduplication_sub$LANE_NUM),hjust = 0.5, vjust = 0.9, position = position_dodge(0.9) ) +
+        scale_x_continuous(name = "number of lanes", breaks = seq(0, max_lane, 1)) +
+        theme(legend.position = "none")
+        dev.off()
+        sink("''' + str(output.outlier_dup) + '''")
+        print(head(data_deduplication_sub[order(-data_deduplication_sub$TOTAL_DUP),],10))
+        sink()                     
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')

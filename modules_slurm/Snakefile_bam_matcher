@@ -1,0 +1,86 @@
+#!/usr/bin/python
+import glob
+import sys
+import os
+from glob import iglob
+
+pair_manifest = config['pairs']
+bamMatcher_dir = 'bamMatcher'
+bamMatcherExe = config['BamMatcher']
+
+PAIRS = []
+tumorDict = {}
+normalDict = {}
+
+with open(pair_manifest) as f:
+    for line in f:
+        (tumor, normal, vcf) = line.split()
+        sample = os.path.basename(vcf)[:-4]
+        PAIRS.append(os.path.basename(vcf)[:-4])
+        tumorName = os.path.basename(tumor)[:-4]
+        normalName = os.path.basename(normal)[:-4]
+        tumorDict[sample] = (tumor)
+        normalDict[sample] = (normal)
+
+def get_tumor(wildcards):
+    (file) = tumorDict[wildcards.sample]
+    return file
+
+def get_normal(wildcards):
+    (file) = normalDict[wildcards.sample]
+    return file 
+ 
+# rule all:
+    # input:
+        # bamMatcher_dir + '/bam_matcher_report_all.txt'
+ 
+rule run_bam_matcher:
+    input:
+        tumorBam=get_tumor,
+        normalBam=get_normal  
+    output: 
+        bamMatcher_dir + '/{sample}/bam_matcher_report_{sample}.txt' 
+    params:
+        exe = bamMatcherExe,
+        ref = refFile,
+        cache = bamMatcher_dir + '/{sample}/'
+    shell:
+        #'. /etc/profile.d/modules.sh; module load python;'
+        'python {params.exe} --bam1 {input.tumorBam} --bam2 {input.normalBam} --output {output} --reference {params.ref} --cache-dir {params.cache}'        
+    
+rule summary_bam_matcher:
+    input: 
+        single = expand(bamMatcher_dir + '/{sample}/bam_matcher_report_{sample}.txt', sample = PAIRS)
+    output:
+        bamMatcher_dir + '/bam_matcher_report_all.txt'
+    run:
+        with open(output[0], 'w') as outfile: 
+            outfile.write( 'SAMPLE\tSITE\tRATE\tCONCLUSION' + '\n' )
+            for fname in input.single:   
+                with open(fname, 'r') as infile:
+                    SAMP=os.path.basename(fname)  ## here we can not use os.path.basename(infile) because infile is _io.TextIOWrapper not os.PathLike object
+                    lines=infile.readlines()
+                    SITE=lines[23].split(':')[1].rstrip()
+                    RATE=lines[24].split(':')[1].split('(')[0].rstrip()
+                    CONCLUSION=lines[27].rstrip()
+                    outfile.write( SAMP + '\t' + SITE + '\t' + RATE+ '\t' + CONCLUSION + '\n' )
+                    
+rule bammatcher_plot:
+    input:
+        bamMatcher_dir + '/bam_matcher_report_all.txt'
+    output:
+        png_bammatcher = bamMatcher_dir + '/bam_matcher_check.png',
+        R = bamMatcher_dir + '/bam_matcher_check.R',
+        Rout = bamMatcher_dir + '/bam_matcher_check.R.out'
+    run:
+        rTxt = '''
+        data <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_bammatcher) + '''", 6.5, 6.5, "in", res = 300)
+        plot(data$RATE,data$SITE, xlab="Fraction of site with common genotype", ylab="Checking site number", pch=19, xlim=c(0.3,1)) 
+        dev.off()
+
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')                    
+                    

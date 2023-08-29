@@ -1,0 +1,60 @@
+#!/usr/bin/python
+#https://www.biostars.org/p/299569/ 
+#import glob
+import sys
+import os
+       
+rule run_relatedness2:
+    input:
+        postcalling_qc_dir + '/variants_annotated_majority_intersect.vcf.gz'
+    output:
+#        offDiagonalReport = relatedness_dir + '/out_off_diagonal.relatedness2',
+        pairwiseReport = 'out.relatedness2'
+#    params:
+#        totalSamp = len(SAMPLES)  
+    singularity: "docker://biocontainers/vcftools:v0.1.16-1-deb_cv1"
+    shell:
+        #'. /etc/profile.d/modules.sh; module load zlib vcftools;'       
+        'vcftools --gzvcf {input} --relatedness2;'
+
+#tail command is giving the non-zero exit code error
+#https://stackoverflow.com/questions/46569236/handling-sigpipe-error-in-snakemake
+rule off_diagnal_table:
+    input:
+        pairwiseReport = 'out.relatedness2',
+    output:
+        offDiagonalReport = relatedness_dir + '/out_off_diagonal.relatedness2'
+    params:
+        totalSamp = len(SAMPLES)
+    shell:
+        'set +o pipefail; total={params.totalSamp};'
+        'for i in `seq 1 ${{total}}`;do samp=`echo "${{i}}*${{total}}+1" | bc -l`;order=`echo "${{total}}-${{i}}" | bc -l`; head -n ${{samp}} {input.pairwiseReport}| tail -n ${{order}};done  > {output.offDiagonalReport}'   
+
+rule relatedness_plot:
+    input:
+        pairwiseReport = 'out.relatedness2',
+        offDiagonalReport = relatedness_dir + '/out_off_diagonal.relatedness2'
+    output:
+        png_relatedness = relatedness_dir + '/relatedness.png',
+        png_hist = relatedness_dir + '/relatedness_hist.png',
+        R = relatedness_dir + '/relatedness.R',
+        Rout = relatedness_dir + '/relatedness.R.out'
+    run:
+        rTxt = '''
+        library(ggplot2)
+        data_relatedness <- read.table("''' + str(input.pairwiseReport) + '''", header = TRUE, sep = "\t")
+        png("''' + str(output.png_relatedness) + '''", 6.5, 6.5, "in", res = 300)
+        ggplot(data_relatedness, aes(y=INDV2, x=INDV1) ) + geom_tile(aes(fill = log(RELATEDNESS_PHI,0.5)),colour = "green") +
+        scale_fill_gradient(low = "green",high = "red") +
+        scale_fill_continuous(limits = c(1,5), breaks = c(1, 2, 3, 4,5)) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+        dev.off()
+        data_hist <- read.table("''' + str(input.offDiagonalReport) + '''", header = FALSE, sep = "\t")
+        png("''' + str(output.png_hist) + '''", 6.5, 6.5, "in", res = 300)
+        hist(data_hist[,7], breaks=100, main="Histogram for All Off-diagonal Pair Samples", xlab = "Off-diagonal elements of genetic relationship matrix",ylab="density", xlim=c(-0.3,0.3))
+        dev.off()
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')     
+

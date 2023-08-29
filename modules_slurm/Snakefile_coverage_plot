@@ -1,0 +1,141 @@
+#!/usr/bin/python
+#https://stackoverflow.com/questions/5633828/convert-html-to-an-image-in-python in case we need to convert html to png image for mosdepth
+#import glob
+import sys
+import os
+
+
+#rule all:
+#    input:
+#        png_ave_depth = coverage_dir + '/Average_Coverage_caco.png',
+#        lane_dup_rate = coverage_dir + '/Final_merged_coverage.txt'
+		
+rule mosdepth:
+    input:
+        project + '/mosdepth_dist.html'
+    output:
+        coverage_dir + '/mosdepth_total_dist.html'
+    run:
+        with open(output[0], 'w') as out, open(input[0]) as f:
+            for line in f:
+                if not ('chr' in line):
+                    out.write(line)
+                    
+if config['MODE'] == 'somatic': 
+    rule average_depth_caco_somatic:
+        input:
+            report = precallingReport,
+            pairs = pair_manifest
+        output:
+            coverage_dir + '/Average_Coverage_caco.txt'
+        run:
+            TUMORS=[]
+            NORMALS=[]
+            with open(input.pairs) as manifest:
+                for line in manifest:
+                    normal=os.path.basename(line.split('\t')[1])[:-4]
+                    if normal not in NORMALS:
+                        NORMALS.append(normal) 
+                       #NORMALS.append(normal) if normal not in NORMALS
+            with open(output[0], 'w') as out, open(input.report) as f:
+                out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
+                next(f)
+                for line in f:
+                    SAMPLE=line.split('\t')[0]
+                    DEPTH=line.split('\t')[24].rstrip()
+                    if (SAMPLE in NORMALS):
+                        out.write( SAMPLE + '\tNORMAL\t' + DEPTH + '\n' )
+                    else:
+                        out.write( SAMPLE + '\tTUMOR\t' + DEPTH + '\n' )
+elif config['MODE'] == 'wgs':  
+    rule average_depth_caco:
+        input:
+            precallingReport
+        output:
+            coverage_dir + '/Average_Coverage_caco.txt'
+        run:
+            with open(output[0], 'w') as out, open(input[0]) as f:
+                out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
+                next(f)
+                for line in f:
+                    SAMPLE=line.split('\t')[0]
+                    DEPTH=line.split('\t')[20].rstrip()   
+                    out.write( SAMPLE + '\tCASE\t' + DEPTH + '\n' )                    
+else:
+    rule average_depth_caco:
+        input:
+            precallingReport
+        output:
+            coverage_dir + '/Average_Coverage_caco.txt'
+        run:
+            with open(output[0], 'w') as out, open(input[0]) as f:
+                out.write( 'ANALYSISID\tSTATUS\tCOV' + '\n' )
+                next(f)
+                for line in f:
+                    SAMPLE=line.split('\t')[0]
+                    DEPTH=line.split('\t')[24].rstrip()
+                    if not any (CONTROL in line for CONTROL in CONTROLS):
+                        out.write( SAMPLE + '\tCASE\t' + DEPTH + '\n' )
+                    else:
+                        out.write( SAMPLE + '\tCONTROL\t' + DEPTH + '\n' )
+
+           
+rule final_table:
+    input:
+        Manifest = manifest,
+        input = coverage_dir + '/Average_Coverage_caco.txt'
+    output:
+        lane_dup_rate = coverage_dir + '/Final_merged_coverage.txt',
+        subject_dup_rate = coverage_dir + '/../Downsample.txt'
+    params:
+        coverage_dir
+    shell:
+        'sh ./modules_slurm/coverage_merge.sh {input.Manifest} {input.input} {params}'
+     
+rule average_depth_plot:
+    input:
+        coverage_dir + '/Final_merged_coverage.txt'
+    output:
+        png_aveCov = coverage_dir + '/Average_Coverage_caco.png',
+        png_addedCov = coverage_dir + '/Added_Coverage_caco.png',
+        R = coverage_dir + '/average_depth_plot.R',
+        Rout = coverage_dir + '/average_depth_plot.R.out'
+    run:
+        if config['MODE'] == 'somatic':
+            rTxt = '''
+            colors <- c("TUMOR"="#f04546", "NORMAL"="#3591d1")
+            '''
+        else:
+            rTxt = '''
+            colors <- c("CASE"="#f04546", "CONTROL"="#3591d1")
+            '''        
+        rTxt += '''
+        library(ggplot2)
+        data_coverage <- read.table("''' + str(input) + '''", header = TRUE, sep = "\t")
+        sortData <- data_coverage[with(data_coverage, order(data_coverage$STATUS,data_coverage$COV)), ]
+        downsample <- c("YES"=4, "NO"=19)
+        png("''' + str(output.png_aveCov) + '''", 7, 7, "in", res = 300)
+        gg <- ggplot(sortData, aes(x=factor(ANALYSISID, levels=unique(ANALYSISID)), y=COV)) 
+        gg + geom_point(aes(shape=as.factor(DOWNSAMPLE),color=as.factor(STATUS))) + 
+        scale_shape_manual(name="Downsample", values=downsample) +
+        scale_color_manual(name="Status",values=colors) + 
+        coord_cartesian(clip = 'off') +
+        labs(x = "samples", y = "Average Cov") +
+        theme(legend.position="right",axis.text.x=element_blank())+
+        theme(axis.line = element_line(size = 1, colour = "grey"),panel.background = element_rect(fill = "white"))
+        dev.off()
+        colors <- c("MergedBam"="#f04546", "LaneBamSum"="#3591d1")
+        png("''' + str(output.png_addedCov) + '''", 6.5, 6.5, "in", res = 300)
+        gg <- ggplot(sortData, aes(x=factor(ANALYSISID, levels=unique(ANALYSISID))))
+        gg + geom_point(aes(y=COV, shape=as.factor(DOWNSAMPLE), color="MergedBam")) +
+        geom_point(aes(y=ADDED_COV, shape=as.factor(DOWNSAMPLE),color="LaneBamSum")) +
+        scale_shape_manual(name="Downsample", values=downsample) + 
+        labs(x = "samples", y = "Cov") +
+        theme(legend.position="right",axis.text.x=element_blank(),axis.ticks.x=element_blank())+
+        theme(axis.line = element_line(size = 1, colour = "grey"),panel.background = element_rect(fill = "white"))
+        dev.off()
+        '''
+        with open(output.R, 'w') as R:
+            R.write(rTxt)
+        shell('R --vanilla < {output.R} > {output.Rout}')
+
