@@ -1,3 +1,0 @@
-AttributeError in line 14 of /mnt/nfs/gigantor/ifs/DCEG/CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/ExomeQcPipeline/modules/Snakefile_gender_plot:
-'function' object has no attribute 'iglob'
-  File "/mnt/nfs/gigantor/ifs/DCEG/CGF/Bioinformatics/Production/Wen/20180911_snakemake_coverage_tools/ExomeQcPipeline/modules/Snakefile_gender_plot", line 14, in <module>
