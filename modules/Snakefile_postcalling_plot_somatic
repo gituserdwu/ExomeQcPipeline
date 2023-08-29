@@ -13,21 +13,21 @@ from glob import glob
 #        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS), 
 #        basechange_all = postcalling_qc_dir + '/basechange_all.png',
 
-rule run_filter:
-    input:
-        ensemble_dir + '/{sample}_5callers_voting.vcf'
-    output:
-        postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf'
-    params:
-        bed = bedFile,
-        prefix = postcalling_qc_dir + '/{sample}_intersection_region_passed'
-    shell:
-        '. /etc/profile.d/modules.sh; module load vcftools;'
-        '''awk -F"\t" '{{if ( $1 ~ "^#" || $7 ~ "PASS;" ){{print}}}}' {input} | vcftools --vcf - --bed {params.bed}  --recode --recode-INFO-all --out {params.prefix};'''
+#rule run_filter:
+#    input:
+#        ensemble_dir + '/{sample}_5callers_voting.vcf'
+#    output:
+#        postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf'
+#    params:
+#        bed = bedFile,
+#        prefix = postcalling_qc_dir + '/{sample}_intersection_region_passed'
+#    shell:
+#        '. /etc/profile.d/modules.sh; module load vcftools;'
+#        '''awk -F"\t" '{{if ( $1 ~ "^#" || $7 ~ "PASS;" ){{print}}}}' {input} | vcftools --vcf - --bed {params.bed}  --recode --recode-INFO-all --out {params.prefix};'''
         
 rule run_basechange:
     input:
-        expand(postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf', sample = PAIRS)
+        expand(postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf', sample = SAMPLES)
     output:
         basechange = postcalling_qc_dir + '/ensemble_basechange.txt',
         vaf = postcalling_qc_dir + '/ensemble_vaf_dp.txt'        
@@ -92,7 +92,7 @@ rule basechange_distribution_plot:
         library(ggplot2)
 
         data <- read.table("''' + str(input) + '''", header = FALSE, sep = "\t")
-        names(data) <- c("CHR", "POS", "BaseChange", "RD", "VAF")
+        names(data) <- c("SAMP", "CHR", "POS", "BaseChange", "RD", "VAF")
         stat_box_data <- function(y) {
             return( 
                 data.frame(
@@ -104,7 +104,7 @@ rule basechange_distribution_plot:
 
         png("''' + str(output.plot) + '''")
         ggplot(data=data, aes(x=data$BaseChange, y=VAF)) +
-        geom_violin(draw_quantiles = c(0.25, 0.5, 0.75),adjust=2,,scale = "width", add = "boxplot")+ 
+        geom_violin(draw_quantiles = c(0.25, 0.5, 0.75),adjust=2,scale = "width", add = "boxplot")+ 
         stat_summary(fun.data = stat_box_data,geom = "text",aes(group=data$BaseChange),hjust = 0.5, vjust = 0.9, position = position_dodge(0.9) ) +
         labs(x = "base change", y = "VAF") 
         dev.off()

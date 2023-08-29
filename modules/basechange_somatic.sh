@@ -15,6 +15,7 @@ FIRST=true
 # for f in *WES_passed.vcf.gz; do
 HEADER="FileName"
 module load vcftools zlib
+rm $VAF_TXT
 touch $VAF_TXT
 #for f in *germline_sSNV_4callers.vcf; do
 for f in $VCF_LIST; do
@@ -24,7 +25,7 @@ for f in $VCF_LIST; do
   echo $f
 #  OUTPUT=`basename $f _bqsr_final_out_passed.vcf`
 #  OUTPUT=`basename $f _intersect.recode.vcf`
-  OUTPUT=`basename $f _passed.vcf`
+  OUTPUT=`basename $f .vcf`
 #  CMD="vcftools --vcf $f --out ${VCF_DIR}/${OUTPUT}_in_intersection --bed $BED_FILE --recode --keep-INFO-all"
 #  echo $CMD
 #  eval $CMD
@@ -45,34 +46,7 @@ BEGIN{
 }
 
 {
-if ( $1 !~ "#" && $7 ~ ";PASS" ) { 
-	REF=$4
-	ALT=$5	
-	INFO=$8
-	split(INFO, INFO_TOKENS, ";")
-	SAMPLE=$10
-	split(SAMPLE, SAMPLE_TOKENS, ":")
-	
-	TOKEN_COUNT=length(INFO_TOKENS)
-
-	for (IDX = 1; IDX <= TOKEN_COUNT; IDX++)	{
-		if (INFO_TOKENS[IDX] ~ /^Tumor_AF/ ) {
-			AF = INFO_TOKENS[IDX]
-
-			gsub(/Tumor_AF=/, "", INFO_TOKENS[IDX])
-			VAF = INFO_TOKENS[IDX]
-		}
-		if (INFO_TOKENS[IDX] ~ "^Tumor_DP*") {
-			
-			DP = INFO_TOKENS[IDX]
-			gsub(/Tumor_DP=/, "", INFO_TOKENS[IDX])
-			RD = INFO_TOKENS[IDX]
-		}
-	}
-	if ( length(REF) ==1 && length(ALT) ==1 ) {
-		printf("%s\t%s\t%s\t%s>%s\t%d\t%f\n", name,$1,$2,REF,ALT,RD,VAF)
-	}
-}
+if ( $1 !~ "#" && $7 ~ "PASS" ) {REF=$4;ALT=$5;FORMAT=$9;split(FORMAT, FORMAT_TOKENS, ":");SAMPLE=$10;split(SAMPLE, SAMPLE_TOKENS, ":");TOKEN_COUNT=length(FORMAT_TOKENS);for (IDX = 1; IDX <= TOKEN_COUNT; IDX++) {if (FORMAT_TOKENS[IDX] ~ /AF/ ) {VAF = SAMPLE_TOKENS[IDX]};if (FORMAT_TOKENS[IDX] ~ "DP") {RD = SAMPLE_TOKENS[IDX]}} if ( length(REF) ==1 && length(ALT) ==1 ) {printf("%s\t%s\t%s\t%s>%s\t%d\t%f\n", name,$1,$2,REF,ALT,RD,VAF)}}
 }' >> $VAF_TXT
 
 ##############################
@@ -109,11 +83,6 @@ else
 fi
 OUTPUT=`echo -e $OUTPUT"\t"$COUNT`
 
-# HEADER=`echo -e $HEADER"\tTI\tTV\tRATIO"`
-# TI=`echo $OUTPUT | awk '{print $4+$6+$9+$11}'`
-# TV=`echo $OUTPUT | awk '{print $2+$3+$5+$7+$8+$10+$12+$13}'`
-# RATIO=`echo "${TI}/${TV}"| bc -l | xargs -I {} printf "%5.4f" {}`
-# OUTPUT=`echo -e $OUTPUT"\t"$TI"\t"$TV"\t"$RATIO`
 
 if [[ $FIRST == "true" ]]; then
   echo $HEADER | awk -F' ' '{for (i=1;i<NF;i++) printf("%s\t",$i); printf $NF"\n";}' > $OUT_TXT

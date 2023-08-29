@@ -2,18 +2,19 @@
 import sys
 import os
 
-if config['MODE'] == 'somatic':
+if config['MODE'] == 'somatic' or config['MODE'] == 'tumor_only':
     rule run_filter_somatic:
         input:
-            ensemble_dir + '/{sample}_5callers_voting_PASS.vcf'
+            ensemble_dir + '/{sample}_WES_PON_passed.vcf'
         output:
             postcalling_qc_dir + '/{sample}_intersection_region_passed.recode.vcf'
         params:
             bed = bedFile,
-            prefix = postcalling_qc_dir + '/{sample}_intersection_region_passed'
+            prefix = postcalling_qc_dir + '/{sample}_intersection_region_passed.vcf.gz'
         shell:
-            '. /etc/profile.d/modules.sh; module load vcftools;'
-            '''awk -F"\t" '{{if ( $1 ~ "^#" || $7 ~ "PASS;" ){{print}}}}' {input} | vcftools --vcf - --bed {params.bed}  --recode --recode-INFO-all --out {params.prefix};'''
+            'module load bcftools tabix;'
+            'bgzip -c {input} > {params.prefix} && tabix -p vcf {params.prefix};'
+            'bcftools view -f "PASS" --regions-file {params.bed} {params.prefix} > {output}'           
 
 else:
     rule run_filter:

@@ -76,7 +76,7 @@ if config['MODE'] == 'somatic':
     bamMatcher_dir = 'bamMatcher'
     bamMatcherExe = config['BamMatcher']
 
-    PAIRS = []
+    SAMPLES = []
     tumorDict = {}
     normalDict = {}
 
@@ -84,7 +84,7 @@ if config['MODE'] == 'somatic':
         for line in f:
             (tumor, normal, vcf) = line.split()
             sample = os.path.basename(vcf)[:-4]
-            PAIRS.append(os.path.basename(vcf)[:-4])
+            SAMPLES.append(os.path.basename(vcf)[:-4])
             tumorName = os.path.basename(tumor)[:-4]
             normalName = os.path.basename(normal)[:-4]
             tumorDict[sample] = (tumor)
@@ -109,18 +109,18 @@ if config['MODE'] == 'somatic':
 include: 'modules/Snakefile_contamination_plot'
 include: 'modules/Snakefile_coverage_plot'
 include: 'modules/Snakefile_duplication_plot'
-include: 'modules/Snakefile_fastqc'   
+#include: 'modules/Snakefile_fastqc'   
 
 if not config['MODE'] == 'wgs':
     include: 'modules/Snakefile_exomeCQA_plot'
-    include: 'modules/Snakefile_ancestry_plot_laser'
+    #include: 'modules/Snakefile_ancestry_plot_laser'
 else:
     include: 'modules/Snakefile_ancestry_plot_fastNGSadmix'
     
-include: 'modules/Snakefile_gender_plot'
+#include: 'modules/Snakefile_gender_plot'
 include: 'modules/Snakefile_pre_calling_plot'
 
-if config['MODE'] == 'somatic':
+if config['MODE'] == 'somatic' or 'tumor_only':
     include: 'modules/Snakefile_postcalling_plot_somatic'
     include: 'modules/Snakefile_ancestry_plot_laser'
 else:    
@@ -132,5 +132,5 @@ include: 'modules/Snakefile_doc'
 rule all:
     input:
         bamMatcher_dir + '/bam_matcher_report_all.txt' if config['MODE'] == 'somatic' else [],
-        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS) if not config['MODE'] == 'somatic' else [], 
+        basechange_group = expand(postcalling_qc_dir + '/basechange_{group}.png', group = GROUPS) if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [], 
         word_report = 'word_doc/' + outName + '_QC_Report.docx'

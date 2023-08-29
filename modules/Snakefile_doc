@@ -38,7 +38,7 @@ else:
         output:
             'word_doc/sample_summary.txt'
         params:
-            postcalling_qc_dir + '/titv.txt'
+            postcalling_qc_dir + '/ensemble_basechange.txt' if config['MODE'] == 'tumor_only' else postcalling_qc_dir + '/titv.txt' 
         run:
             GroupDict = {}
             with open(output[0], 'w') as outfile: 
@@ -79,15 +79,15 @@ rule word_doc:
         ccs_plot = 'exomeCQA/cohort_coverage_sparseness.png' if not config['MODE'] == 'wgs' else [],
         ue_plot = 'exomeCQA/unevenness.png' if not config['MODE'] == 'wgs' else [],
         top10_ue = 'exomeCQA/top10_ue.txt' if not config['MODE'] == 'wgs' else [],
-        total_count = 'postcalling_qc/variant_count.png' if not config['MODE'] == 'somatic' else [],
-        botton10_count = 'postcalling_qc/variant_outlier10.txt' if not config['MODE'] == 'somatic' else [],
-        titv_ratio = 'postcalling_qc/titv_ratio.png' if not config['MODE'] == 'somatic' else [],
-        botton10_titv = 'postcalling_qc/titv_outlier10.txt' if not config['MODE'] == 'somatic' else [],
-        relatedness = 'out.relatedness2' if not config['MODE'] == 'somatic' else [],
-        relatedness_hist = relatedness_dir + '/relatedness_hist.png' if not config['MODE'] == 'somatic' else [],
-        missingRate_hist = 'postcalling_qc/callRate_byGroup.jpeg' if not config['MODE'] == 'somatic' else [],
-        basechange = postcalling_qc_dir + '/basechange_3d.png' if config['MODE'] == 'somatic' else 'postcalling_qc/basechange_all.png',
-        basechange_distribution = postcalling_qc_dir + '/basechange_distribution.png'  if config['MODE'] == 'somatic' else [],
+        total_count = 'postcalling_qc/variant_count.png' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        botton10_count = 'postcalling_qc/variant_outlier10.txt' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        titv_ratio = 'postcalling_qc/titv_ratio.png' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        botton10_titv = 'postcalling_qc/titv_outlier10.txt' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        relatedness = 'out.relatedness2' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        relatedness_hist = relatedness_dir + '/relatedness_hist.png' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        missingRate_hist = 'postcalling_qc/callRate_byGroup.jpeg' if config['MODE'] == 'wgs' or config['MODE'] == 'wes' else [],
+        basechange = postcalling_qc_dir + '/basechange_3d.png' if config['MODE'] == 'somatic' or 'tumor_only' else 'postcalling_qc/basechange_all.png',
+        basechange_distribution = postcalling_qc_dir + '/basechange_distribution.png'  if config['MODE'] == 'somatic' or 'tumor_only' else [],
         bam_matcher_plot = bamMatcher_dir + '/bam_matcher_check.png' if config['MODE'] == 'somatic' else []
     output:
         doc = 'word_doc/' + outName + '_QC_Report.docx', 
@@ -142,7 +142,7 @@ ft_3 <- align(ft_3, align = "center")
 
 '''
 
-        if not config['MODE'] == 'somatic':
+        if config['MODE'] == 'wgs' or config['MODE'] == 'wes':
             rTxt += '''
 table_6a <- read.table("''' + input.botton10_count + '''", header = TRUE)
 
@@ -288,6 +288,12 @@ my_doc <- read_docx(path = "''' + input.template + '''") %>%
     slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") %>%    
     cursor_reach(keyword = "Figure 11. scatter plot of testing site count against concordant rate") %>%
     slip_in_img(src = "''' + input.bam_matcher_plot + '''", width = 5, height = 5, pos = "before") '''
+        elif config['MODE'] == 'tumor_only':
+            rTxt += '''         
+    cursor_reach(keyword = "Figure 10a. VAF distribution across all base changes") %>%
+    slip_in_img(src = "''' + input.basechange_distribution + '''", width = 5, height = 5, pos = "before") %>%   
+    cursor_reach(keyword = "Figure 10b. base change counts per disease group") %>%
+    slip_in_img(src = "''' + input.basechange + '''", width = 5, height = 5, pos = "before") '''
         else:    
             rTxt += '''     
     body_replace_all_text("GROUP_BASECHANGE", "''' + str(groupBasechangeDir) + '''", fixed=TRUE) %>%
